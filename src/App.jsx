@@ -7,16 +7,16 @@ import {
   CloudUpload, FileText, Camera
 } from 'lucide-react';
 
+// --- FIREBASE IMPORTS ---
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, onSnapshot, doc, addDoc, updateDoc } from 'firebase/firestore';
+
 // ==========================================
 // 1. ASSET & KONFIGURASI (STABIL)
 // ==========================================
 
-// PENGATURAN LOGO CUSTOM: 
-// 1. Masukkan file gambar logo Bapak (misal: logo.png) ke dalam folder "public" di VS Code.
-// 2. Ubah tanda kutip di bawah ini menjadi "/logo.png"
-// 3. Jika dibiarkan kosong "", aplikasi akan kembali memakai logo huruf 'e' bawaan.
-const LOGO_UTAMA = "/logo.png"; 
-
+const LOGO_UTAMA = "./logo.png"; 
 const LOGO_WA = "https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg";
 
 const IKON_GENDER = {
@@ -47,8 +47,6 @@ const getProgramThumb = (name) => {
 };
 
 const DAFTAR_AGAMA = ["Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Khonghucu"];
-const DAFTAR_BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-const DAFTAR_TAHUN = ["2024", "2025", "2026", "2027", "2028"];
 const JAM_BELAJAR_OPTIONS = ["16.00 - 17.30", "18.30 - 20.00 (belum dibuka)"];
 
 const PROGRAM_CHOICES = [
@@ -99,14 +97,40 @@ const getKeterangan = (rataRata) => {
   return 'SANGAT BAIK';
 };
 
-const getWarnaStatus = (rataRata) => {
-  const n = Number(rataRata);
-  if (n < 50) return 'text-red-600 bg-red-50 border-red-100';
-  if (n <= 75) return 'text-amber-600 bg-amber-50 border-amber-100';
-  return 'text-emerald-600 bg-emerald-50 border-emerald-100';
+// ==========================================
+// 3. FIREBASE SETUP
+// ==========================================
+const firebaseConfig = {
+  apiKey: "AIzaSyCxjm6oTLmAZPFnoxsQpDr4CjYsTxYgiKQ",
+  authDomain: "database-shortcourse.firebaseapp.com",
+  projectId: "database-shortcourse",
+  storageBucket: "database-shortcourse.firebasestorage.app",
+  messagingSenderId: "861625929338",
+  appId: "1:861625929338:web:d5111f6422745154ad35c3",
+  measurementId: "G-QN8YEE07DY"
 };
 
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = 'database-shortcourse-enter';
+
+// Data bawaan untuk Mode Offline
+const MOCK_PARTICIPANTS = [
+  { 
+    id: 1, nik: '3201010101010001', nama: 'BUDI SANTOSO', email: 'budi@example.com', telepon: '081234567890', 
+    tempatLahir: 'Jakarta', tanggalLahir: '1995-01-10', gender: 'Laki-laki', agama: 'Islam', alamat: 'JL. SUDIRMAN NO. 12, JAKARTA', 
+    program: 'Microsoft Office Basic (12x Pertemuan)', category: 'Reguler', status: 'Aktif', 
+    jamBelajar: '16.00 - 17.30', tanggalMulaiBelajar: '2024-01-10', tanggalSelesaiBelajar: '', photo: null, tanggalDaftar: '10/01/2024',
+    nilai: []
+  }
+];
+const MOCK_CERTS = [
+  { id: 101, namaSiswa: 'SITI AMINAH', noSertifikat: 'ENT/2026/001', program: 'Desain Grafis (24x Pertemuan)', fileUrl: '#', fileName: 'Sertifikat_Siti.pdf', uploadDate: '28/02/2026' }
+];
+
 export default function App() {
+  const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [message, setMessage] = useState(null);
@@ -115,21 +139,9 @@ export default function App() {
   const [selectedGradCourse, setSelectedGradCourse] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   
-  // State Sertifikat (Arsip Digital)
-  const [certificates, setCertificates] = useState([
-    { id: 101, namaSiswa: 'SITI AMINAH', noSertifikat: 'ENT/2026/001', program: 'Desain Grafis (24x Pertemuan)', fileUrl: '#', fileName: 'Sertifikat_Siti.pdf', uploadDate: '28/02/2026' }
-  ]);
-
-  // State Peserta
-  const [participants, setParticipants] = useState([
-    { 
-      id: 1, nik: '3201010101010001', nama: 'BUDI SANTOSO', email: 'budi@example.com', telepon: '081234567890', 
-      tempatLahir: 'Jakarta', tanggalLahir: '1995-01-10', gender: 'Laki-laki', agama: 'Islam', alamat: 'JL. SUDIRMAN NO. 12, JAKARTA', 
-      program: 'Microsoft Office Basic (12x Pertemuan)', category: 'Reguler', status: 'Aktif', 
-      jamBelajar: '16.00 - 17.30', tanggalMulaiBelajar: '2024-01-10', tanggalSelesaiBelajar: '', photo: null, tanggalDaftar: '10/01/2024',
-      nilai: []
-    }
-  ]);
+  // State Data (Tahan Banting - Bisa Mode Online/Offline)
+  const [certificates, setCertificates] = useState(MOCK_CERTS);
+  const [participants, setParticipants] = useState(MOCK_PARTICIPANTS);
 
   const [selectedParticipant, setSelectedParticipant] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -139,6 +151,58 @@ export default function App() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [tempNilai, setTempNilai] = useState([]);
   const [tempPhoto, setTempPhoto] = useState(null);
+
+  // Inisialisasi Auth Firebase Anti-Crash
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Info: Firebase Auth gagal, pindah ke Mode Lokal.", err);
+        // Notifikasi ramah jika belum di-set di Firebase Console
+        if (err?.message?.includes("auth/configuration-not-found") || err?.message?.includes("admin-restricted-operation")) {
+           setMessage("Info: Aktifkan mode 'Anonymous' di menu Authentication Firebase agar data tersimpan ke Cloud.");
+           setTimeout(() => setMessage(null), 8000);
+        }
+      }
+    };
+    initAuth();
+    
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+       if (u) setUser(u);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch Data dari Firestore (Real-time) - Hanya jika Online
+  useEffect(() => {
+    if (!user) return;
+    
+    const participantsRef = collection(db, 'artifacts', appId, 'public', 'data', 'participants');
+    const unsubParticipants = onSnapshot(participantsRef, (snapshot) => {
+      if (!snapshot.empty) {
+         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+         setParticipants(data.reverse()); 
+      }
+    }, (error) => console.error("Error ambil data peserta:", error));
+
+    const certsRef = collection(db, 'artifacts', appId, 'public', 'data', 'certificates');
+    const unsubCerts = onSnapshot(certsRef, (snapshot) => {
+      if (!snapshot.empty) {
+         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+         setCertificates(data.reverse());
+      }
+    }, (error) => console.error("Error ambil data sertifikat:", error));
+
+    return () => {
+      unsubParticipants();
+      unsubCerts();
+    };
+  }, [user]);
 
   const handleNavigation = (tab) => { 
     setActiveTab(tab); 
@@ -153,33 +217,73 @@ export default function App() {
 
   const showNotification = (msg) => { setMessage(msg); setTimeout(() => setMessage(null), 3000); };
 
-  const handleAddParticipant = (data) => {
-    setParticipants([...participants, { 
-      ...data, id: Date.now(), tanggalDaftar: new Date().toLocaleDateString('id-ID'), 
-      status: 'Aktif', nilai: [], photo: null, tanggalSelesaiBelajar: '' 
-    }]);
-    showNotification("Registrasi Berhasil!");
-    setActiveTab('database');
+  const handleAddParticipant = async (data) => {
+    const newParticipant = { 
+      ...data, 
+      tanggalDaftar: new Date().toLocaleDateString('id-ID'), 
+      status: 'Aktif', 
+      nilai: [], 
+      photo: null, 
+      tanggalSelesaiBelajar: '' 
+    };
+
+    if (!user) {
+       // Mode Offline / Lokal
+       setParticipants([{ id: Date.now(), ...newParticipant }, ...participants]);
+       showNotification("Registrasi Berhasil (Mode Offline)!");
+       setActiveTab('database');
+       return;
+    }
+
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'participants'), newParticipant);
+      showNotification("Registrasi Berhasil Tersimpan!");
+      setActiveTab('database');
+    } catch (e) {
+      console.error("Error menambah data:", e);
+      showNotification("Gagal menyimpan data ke Cloud.");
+    }
   };
 
-  const handleUploadCert = (e) => {
+  const handleUploadCert = async (e) => {
     e.preventDefault();
+    
     const fd = new FormData(e.target);
     const file = fd.get('file');
-    const fileUrl = file ? URL.createObjectURL(file) : '#';
+    
+    let fileDataUrl = '#';
+    if (file && file.size > 0) {
+       const reader = new FileReader();
+       reader.readAsDataURL(file);
+       await new Promise(resolve => reader.onloadend = resolve);
+       fileDataUrl = reader.result; 
+    }
 
     const newCert = {
-      id: Date.now(),
       namaSiswa: fd.get('namaSiswa').toUpperCase(),
       noSertifikat: fd.get('noSertifikat').toUpperCase(),
       program: fd.get('program'),
-      fileName: file ? file.name : 'Unknown.pdf',
-      fileUrl: fileUrl,
+      fileName: file ? file.name : 'Unknown',
+      fileUrl: fileDataUrl,
       uploadDate: new Date().toLocaleDateString('id-ID')
     };
-    setCertificates([newCert, ...certificates]);
-    setIsUploadModalOpen(false);
-    showNotification("Backup Sertifikat Berhasil!");
+
+    if (!user) {
+       // Mode Offline
+       setCertificates([{ id: Date.now(), ...newCert }, ...certificates]);
+       setIsUploadModalOpen(false);
+       showNotification("Sertifikat Tersimpan (Mode Offline)!");
+       return;
+    }
+
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'certificates'), newCert);
+      setIsUploadModalOpen(false);
+      showNotification("Backup Sertifikat Tersimpan Aman di Cloud!");
+    } catch (e) {
+      console.error(e);
+      showNotification("Gagal upload sertifikat (Ukuran mungkin terlalu besar).");
+    }
   };
 
   const handleOpenDetail = (p) => {
@@ -193,40 +297,89 @@ export default function App() {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveEdit = (e) => {
+  const handleSaveEdit = async (e) => {
     e.preventDefault();
+    if (!selectedParticipant) return;
+    
     const fd = new FormData(e.target);
-    setParticipants(participants.map(p => p.id === selectedParticipant.id ? {
-      ...p,
-      tanggalSelesaiBelajar: fd.get('tanggalSelesaiBelajar'),
-      status: fd.get('status'),
-      photo: tempPhoto
-    } : p));
-    setIsEditModalOpen(false);
-    showNotification("Data Berhasil Diperbarui!");
+    
+    if (!user || !selectedParticipant.id.toString().includes("-")) {
+       // Mode Offline
+       setParticipants(participants.map(p => p.id === selectedParticipant.id ? {
+          ...p, tanggalSelesaiBelajar: fd.get('tanggalSelesaiBelajar'), status: fd.get('status'), photo: tempPhoto
+       } : p));
+       setIsEditModalOpen(false);
+       showNotification("Data Berhasil Diperbarui (Mode Offline)!");
+       return;
+    }
+
+    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'participants', selectedParticipant.id);
+
+    try {
+      await updateDoc(docRef, {
+        tanggalSelesaiBelajar: fd.get('tanggalSelesaiBelajar'),
+        status: fd.get('status'),
+        photo: tempPhoto 
+      });
+      setIsEditModalOpen(false);
+      showNotification("Data Berhasil Diperbarui di Database!");
+    } catch (err) {
+      console.error(err);
+      showNotification("Gagal memperbarui data.");
+    }
   };
 
   const handlePhotoUpload = (e) => {
     const file = e.target.files[0];
-    if (file) setTempPhoto(URL.createObjectURL(file));
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+         setTempPhoto(reader.result); 
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleOpenNilai = (p) => {
     setSelectedParticipant(p);
-    const materiList = MATERI_OTOMATIS[p.program] || MATERI_DEFAULT_FALLBACK;
-    setTempNilai(materiList.map(m => ({ materi: m, skor: '' })));
+    if (p.nilai && p.nilai.length > 0) {
+       setTempNilai(p.nilai);
+    } else {
+       const materiList = MATERI_OTOMATIS[p.program] || MATERI_DEFAULT_FALLBACK;
+       setTempNilai(materiList.map(m => ({ materi: m, skor: '' })));
+    }
     setIsNilaiModalOpen(true);
   };
 
-  const handleSaveNilai = (e) => {
+  const handleSaveNilai = async (e) => {
     e.preventDefault();
+    if(!selectedParticipant) return;
     const today = new Date();
-    setParticipants(participants.map(p => p.id === selectedParticipant.id ? { 
-      ...p, nilai: tempNilai, status: 'Lulus',
-      tanggalKeluar: today.toLocaleDateString('id-ID'),
-    } : p));
-    setIsNilaiModalOpen(false);
-    showNotification("Siswa Dinyatakan Lulus!");
+
+    if (!user || !selectedParticipant.id.toString().includes("-")) {
+       // Mode Offline
+       setParticipants(participants.map(p => p.id === selectedParticipant.id ? { 
+         ...p, nilai: tempNilai, status: 'Lulus', tanggalKeluar: today.toLocaleDateString('id-ID')
+       } : p));
+       setIsNilaiModalOpen(false);
+       showNotification("Siswa Dinyatakan Lulus (Mode Offline)!");
+       return;
+    }
+    
+    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'participants', selectedParticipant.id);
+
+    try {
+      await updateDoc(docRef, {
+        nilai: tempNilai,
+        status: 'Lulus',
+        tanggalKeluar: today.toLocaleDateString('id-ID')
+      });
+      setIsNilaiModalOpen(false);
+      showNotification("Siswa Dinyatakan Lulus & Nilai Disimpan!");
+    } catch (err) {
+      console.error(err);
+      showNotification("Gagal menyimpan nilai.");
+    }
   };
 
   const handleDirectPrint = (p) => {
@@ -248,8 +401,8 @@ export default function App() {
         {/* --- NOTIFIKASI TOAST --- */}
         {message && (
           <div className="fixed top-32 left-1/2 transform -translate-x-1/2 z-[9999] animate-in slide-in-from-top-10 fade-in duration-500">
-             <div className="bg-slate-900 text-white px-8 py-4 rounded-full shadow-2xl font-black text-sm flex items-center gap-3 border border-slate-700">
-                <CheckCircle size={18} className="text-emerald-400" />
+             <div className="bg-slate-900 text-white px-8 py-4 rounded-full shadow-2xl font-black text-sm flex items-center gap-3 border border-slate-700 max-w-2xl text-center leading-normal">
+                <CheckCircle size={18} className="text-emerald-400 shrink-0" />
                 {message}
              </div>
           </div>
@@ -266,27 +419,46 @@ export default function App() {
              </div>
           </div>
 
-          <div className="hidden lg:flex items-center gap-8 text-left">
-             <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm text-black">
-                <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white shadow-lg leading-none shrink-0"><Phone size={18} /></div>
-                <div className="flex flex-col text-left">
-                   <span className="text-red-600 font-black text-[9px] uppercase">CALL CENTER</span>
-                   <span className="text-slate-900 text-xs font-black mt-1">0821 5050 9000</span>
-                   <span className="text-slate-900 text-xs font-black mt-1">0821 5050 9002</span>
+          <div className="hidden lg:flex items-stretch gap-5 text-left h-16">
+             {/* Call Center */}
+             <div className="flex items-center gap-4 bg-white px-5 rounded-[1.25rem] border border-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-md transition-shadow text-black shrink-0">
+                <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-red-200 shrink-0">
+                   <Phone size={18} />
+                </div>
+                <div className="flex flex-col justify-center">
+                   <span className="text-red-600 font-black text-[9px] uppercase tracking-wider mb-1">Call Center</span>
+                   <span className="text-slate-900 text-[11px] font-black leading-none mb-1">0821 5050 9000</span>
+                   <span className="text-slate-900 text-[11px] font-black leading-none">0821 5050 9002</span>
                 </div>
              </div>
              
-             <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm text-black">
-                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg leading-none shrink-0"><Mail size={18} /></div>
-                <div className="flex flex-col text-left"><span className="text-blue-600 font-black text-[9px] uppercase">KONSULTASI</span><span className="text-slate-900 text-xs font-black mt-1 lowercase">e.serverenter@gmail.com</span></div>
+             {/* Konsultasi */}
+             <div className="flex items-center gap-4 bg-white px-5 rounded-[1.25rem] border border-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-md transition-shadow text-black shrink-0">
+                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-blue-200 shrink-0">
+                   <Mail size={18} />
+                </div>
+                <div className="flex flex-col justify-center">
+                   <span className="text-blue-600 font-black text-[9px] uppercase tracking-wider mb-1">Konsultasi</span>
+                   <span className="text-slate-900 text-[11px] font-black lowercase leading-none">e.serverenter@gmail.com</span>
+                </div>
              </div>
 
-             <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm max-w-[240px] text-black">
-                <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg leading-none shrink-0"><MapPin size={18} /></div>
-                <div className="flex flex-col text-left"><span className="text-emerald-600 font-black text-[9px] uppercase">LOKASI</span><span className="text-slate-900 text-[11px] font-black uppercase mt-1">PANGKALAN BUN</span></div>
+             {/* Lokasi */}
+             <div className="flex items-center gap-4 bg-white px-5 rounded-[1.25rem] border border-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-md transition-shadow text-black max-w-[280px]">
+                <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-emerald-200 shrink-0">
+                   <MapPin size={18} />
+                </div>
+                <div className="flex flex-col justify-center">
+                   <span className="text-emerald-600 font-black text-[9px] uppercase tracking-wider mb-1">Lokasi</span>
+                   <span className="text-slate-900 text-[9px] font-black uppercase leading-[1.4] line-clamp-2" title="JL. P. DIPONEGORO, KAB. KOTAWARINGIN BARAT, KEC. ARUT SELATAN, KALIMANTAN TENGAH">
+                      JL. P. DIPONEGORO, KAB. KOTAWARINGIN BARAT, KEC. ARUT SELATAN, KALIMANTAN TENGAH
+                   </span>
+                </div>
              </div>
 
-             <button onClick={() => setIsMenuOpen(true)} className="p-4 bg-slate-900 text-white rounded-2xl hover:bg-red-600 transition-all shadow-xl ml-4 flex items-center justify-center text-white"><Menu /></button>
+             <button onClick={() => setIsMenuOpen(true)} className="w-16 bg-slate-900 text-white rounded-[1.25rem] hover:bg-red-600 transition-all shadow-xl ml-2 flex items-center justify-center shrink-0">
+                <Menu />
+             </button>
           </div>
           <button onClick={() => setIsMenuOpen(true)} className="lg:hidden p-4 bg-slate-900 text-white rounded-2xl flex items-center justify-center text-white"><Menu /></button>
         </nav>
@@ -363,7 +535,7 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB FORM (KEMBALI LENGKAP) */}
+          {/* TAB FORM */}
           {activeTab === 'form' && (
             <div className="max-w-4xl mx-auto animate-in zoom-in-95 duration-500 text-left">
               <div className="bg-white rounded-[4rem] shadow-2xl border border-slate-100 overflow-hidden text-left leading-none">
@@ -738,10 +910,11 @@ export default function App() {
                 </div>
               )}
               
-              {/* --- FLOAT ACTION BUTTONS (TOMBOL PLUS KEMBALI) --- */}
+              {/* --- FLOAT ACTION BUTTONS (PRINT & DOWNLOAD ADDED) --- */}
               <div className="fixed bottom-12 right-12 flex flex-col items-center gap-5 z-[80] group leading-none text-left">
+                  
                   <div className="flex flex-col items-center opacity-0 group-hover:opacity-100 transition-all translate-y-4 group-hover:translate-y-0 leading-none">
-                    <button onClick={() => showNotification("Fitur Download Sedang Dalam Pengembangan")} className="w-14 h-14 bg-slate-900 text-white rounded-full shadow-xl flex items-center justify-center border-4 border-white shadow-slate-200 group/btn relative">
+                    <button onClick={() => showNotification("Download Laporan Sedang Diproses...")} className="w-14 h-14 bg-slate-900 text-white rounded-full shadow-xl flex items-center justify-center border-4 border-white shadow-slate-200 group/btn relative">
                        <Download size={24} />
                        <div className="absolute right-20 px-3 py-1.5 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover/btn:opacity-100 transition-opacity">Download Excel</div>
                     </button>
@@ -945,7 +1118,6 @@ export default function App() {
                  <div className="bg-slate-950 text-white px-6 py-2.5 rounded-full text-[10px] font-black tracking-widest flex items-center gap-2 mb-10 shadow-lg leading-none uppercase shrink-0 text-white">NIK: {selectedParticipant.nik || '-'}</div>
                  <div className="w-full space-y-5 font-black uppercase text-[11px] tracking-widest leading-none text-left text-left">
                     
-                    {/* BAGIAN CONTACT YANG TELAH DIUBAH */}
                     <a href={`https://wa.me/${selectedParticipant.telepon && selectedParticipant.telepon.startsWith('0') ? '62' + selectedParticipant.telepon.slice(1) : selectedParticipant.telepon}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-6 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm leading-none text-black text-left hover:bg-green-50 transition-colors group cursor-pointer">
                        <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center group-hover:bg-green-500 transition-colors">
@@ -963,7 +1135,15 @@ export default function App() {
               </div>
               <div className="flex-grow p-14 overflow-y-auto bg-white flex flex-col leading-normal text-left text-black font-sans leading-none text-left text-black text-left">
                  <div className="flex justify-between items-start mb-14 shrink-0 leading-none text-black text-left text-left">
-                    <div className="text-left leading-none text-left"><p className="text-[11px] font-black text-red-500 uppercase tracking-[0.4em] mb-3 font-sans text-left text-red-500 text-left">Major Program :</p><h2 className="text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none font-sans text-left text-slate-900 text-left">{selectedParticipant.program}</h2></div>
+                    <div className="text-left leading-none">
+                       <p className="text-[11px] font-black text-red-500 uppercase tracking-[0.4em] mb-3 font-sans">Program Pilihan :</p>
+                       <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tighter leading-tight font-sans">
+                          {selectedParticipant.program?.split(' (')[0]}
+                          <span className="block text-2xl text-slate-500 mt-2 tracking-normal font-bold">
+                             {selectedParticipant.program?.includes(' (') ? `(${selectedParticipant.program.split(' (')[1]}` : ''}
+                          </span>
+                       </h2>
+                    </div>
                     <div className="bg-red-50 p-6 rounded-[2.5rem] border border-red-100 flex items-center gap-4 shrink-0 shadow-sm leading-none text-red-600"><BookOpen size={32} className="text-red-600"/><span className="text-[10px] font-black text-red-950 uppercase tracking-widest leading-none text-red-950">ENTER-ID #{selectedParticipant.id.toString().slice(-4)}</span></div>
                  </div>
                  <div className="bg-gradient-to-br from-red-600 to-red-900 rounded-[3.5rem] p-14 text-white shadow-2xl relative overflow-hidden flex items-center justify-between mb-12 shrink-0 leading-none text-white text-left text-left">
@@ -976,85 +1156,88 @@ export default function App() {
         )}
       </div>
 
-      {/* --- AREA OUTPUT TRANSKRIP PDF --- */}
+      {/* --- AREA OUTPUT TRANSKRIP PDF (FORMAT A5) --- */}
       {selectedParticipant && (
-        <div className="hidden print:block bg-white text-black p-0 min-h-screen fixed inset-0 z-[9999] leading-none text-black text-left">
-          <div className="mx-auto w-[21cm] min-h-[29.7cm] p-10 bg-white border-[16px] border-double border-slate-200 shadow-none flex flex-col relative text-black text-left text-left">
-             <div className="absolute top-4 left-4 opacity-5 italic text-9xl font-black text-black">e</div>
-             <div className="absolute bottom-4 right-4 opacity-5 italic text-9xl font-black text-black">e</div>
-             {selectedParticipant.photo && (
-                <div className="absolute top-40 right-20 w-32 h-40 border-2 border-black p-1 shadow-sm leading-none bg-white z-20">
-                   <img src={selectedParticipant.photo} className="w-full h-full object-cover" />
-                </div>
-             )}
-             <div className="flex items-center gap-10 border-b-4 border-black pb-8 mb-10 leading-none text-black text-left text-left">
-                {LOGO_UTAMA ? (
-                   <img src={LOGO_UTAMA} alt="Logo" className="w-28 h-28 object-contain flex-shrink-0" />
-                ) : (
-                   <div className="w-28 h-28 bg-red-600 rounded-full flex items-center justify-center border-4 border-slate-100 shadow-md flex-shrink-0 leading-none">
-                     <span className="text-white font-black text-5xl italic">e</span>
-                   </div>
-                )}
-                <div className="text-left flex-grow leading-tight text-black text-left text-left">
-                   <h1 className="text-4xl font-black uppercase mb-2 text-black text-left">SHORTCOURSE ENTER</h1>
-                   <p className="text-lg font-bold uppercase mb-2 text-red-600 text-left">Training & Certification Center</p>
-                   <p className="text-[11px] font-bold text-slate-700 leading-relaxed uppercase text-left leading-none">Pangkalan Bun, Kalimantan Tengah | Telp: 0821 5050 9000</p>
-                </div>
+        <div className="hidden print:flex bg-white text-black p-0 min-h-screen fixed inset-0 z-[9999] leading-none font-sans items-start justify-center">
+          <div className="w-[14.8cm] min-h-[21cm] pt-8 px-10 pb-8 bg-white flex flex-col relative text-black" style={{ boxSizing: 'border-box' }}>
+             
+             {/* Header Kop Surat Area & Judul Form */}
+             <div className="flex flex-col items-center text-center mb-6 pb-6">
+                {/* Logo Manual di Atas Judul */}
+                <img src={LOGO_UTAMA} alt="Logo" className="h-16 w-auto object-contain mb-4" />
+                <h2 className="text-[13px] font-black uppercase underline decoration-2 mb-1">FORM. PENILAIAN PESERTA DIDIK</h2>
+                <h3 className="text-[11px] font-bold uppercase mb-0.5 mt-2">KOMPUTER SHORT COURSE / REGULER</h3>
+                <h3 className="text-[11px] font-bold uppercase">LEMBAGA KURSUS DAN PELATIHAN ENTER</h3>
              </div>
-             <div className="text-center mb-12 text-center text-center"><h2 className="text-3xl font-black uppercase underline underline-offset-8 decoration-4 mb-4 text-black text-center leading-none text-center">OFFICIAL TRANSCRIPT</h2></div>
-             <div className="grid grid-cols-2 gap-x-12 mb-10 text-[13px] font-bold uppercase leading-loose text-black bg-slate-50/50 p-8 rounded-3xl border border-slate-100 text-left text-left text-left">
-                <table className="w-full text-black"><tbody>
-                    <tr><td className="w-44 text-slate-400 font-black">Siswa</td><td className="text-black">: {selectedParticipant.nama}</td></tr>
-                    <tr><td className="text-slate-400 font-black">NIK</td><td className="text-black">: {selectedParticipant.nik || '-'}</td></tr>
-                </tbody></table>
-                <table className="w-full text-black"><tbody>
-                    <tr><td className="w-44 text-slate-400 font-black">Program</td><td className="text-black">: {selectedParticipant.program}</td></tr>
-                    <tr><td className="text-slate-400 font-black">Tgl Selesai</td><td className="text-black">: {selectedParticipant.tanggalSelesaiBelajar || selectedParticipant.tanggalKeluar || '-'}</td></tr>
-                </tbody></table>
-             </div>
-             <div className="flex-grow mb-12 leading-none text-black">
-                <table className="w-full border-collapse border-4 border-black text-sm leading-none text-black font-sans text-left">
-                  <thead><tr className="bg-slate-100 text-black leading-none text-black"><th className="border-4 border-black p-5 w-16 text-center font-black leading-none">No</th><th className="border-4 border-black p-5 text-left uppercase font-black leading-none text-left text-left">Materi Pembelajaran</th><th className="border-4 border-black p-5 w-44 text-center font-black leading-none text-center">Skor</th></tr></thead>
+
+             {/* Info Detail Peserta */}
+             <table className="w-full mb-4 text-xs font-bold uppercase leading-relaxed">
+                <tbody>
+                    <tr><td className="w-36 py-1">NAMA PESERTA</td><td className="w-4">:</td><td>{selectedParticipant.nama}</td></tr>
+                    <tr><td className="py-1">PROGRAM</td><td>:</td><td>{selectedParticipant.program?.split(' (')[0]}</td></tr>
+                    {/* HARI BELAJAR DIHILANGKAN */}
+                    <tr><td className="py-1">JAM BELAJAR</td><td>:</td><td>{selectedParticipant.jamBelajar || '___________________________'}</td></tr>
+                </tbody>
+             </table>
+
+             {/* Tabel Penilaian */}
+             <div className="flex-grow mb-6">
+                <table className="w-full border-collapse border-2 border-black text-xs font-bold">
+                  <thead>
+                     <tr className="border-b-2 border-black">
+                        <th className="border-r-2 border-black p-2 w-12 text-center">NO</th>
+                        <th className="border-r-2 border-black p-2 text-left pl-4">MATERI</th>
+                        <th className="p-2 w-32 text-center">NILAI</th>
+                     </tr>
+                  </thead>
                   <tbody>
                     {selectedParticipant.nilai && selectedParticipant.nilai.length > 0 ? selectedParticipant.nilai.map((n, i) => (
-                        <tr key={i} className="text-black leading-none text-left text-left"><td className="border-4 border-black p-5 text-center font-bold text-lg leading-none">{i + 1}</td><td className="border-4 border-black p-5 uppercase font-black text-base text-left leading-none">{n.materi}</td><td className="border-4 border-black p-5 text-center font-black text-2xl bg-slate-50/30 leading-none text-center">{n.skor}</td></tr>
-                      )) : <tr><td colSpan="3" className="p-10 text-center leading-none text-center">Data Belum Ada</td></tr>
+                        <tr key={i} className="border-b border-black">
+                           <td className="border-r-2 border-black p-2 text-center">{i + 1}</td>
+                           <td className="border-r-2 border-black p-2 pl-4 uppercase">{n.materi}</td>
+                           <td className="p-2 text-center text-sm">{n.skor}</td>
+                        </tr>
+                      )) : <tr><td colSpan="3" className="p-6 text-center">Data Belum Ada</td></tr>
                     }
+                    <tr className="border-t-2 border-b border-black">
+                       <td colSpan="2" className="border-r-2 border-black p-2 pr-4 text-right">JUMLAH</td>
+                       <td className="p-2 text-center text-sm">{hitungTotal(selectedParticipant.nilai)}</td>
+                    </tr>
+                    <tr className="border-b border-black">
+                       <td colSpan="2" className="border-r-2 border-black p-2 pr-4 text-right">RATA-RATA</td>
+                       <td className="p-2 text-center text-sm">{hitungRataRata(selectedParticipant.nilai)}</td>
+                    </tr>
+                    <tr>
+                       <td colSpan="2" className="border-r-2 border-black p-2 pr-4 text-right">KETERANGAN</td>
+                       <td className="p-2 text-center text-sm">{getKeterangan(hitungRataRata(selectedParticipant.nilai))}</td>
+                    </tr>
                   </tbody>
-                  {selectedParticipant.nilai.length > 0 && (
-                    <tfoot className="font-black bg-slate-900 text-white text-white">
-                      <tr className="text-white"><td colSpan="2" className="border-4 border-black p-5 text-right uppercase text-xs text-white">Rata-Rata Nilai (GPA)</td><td className="border-4 border-black p-5 text-center text-3xl bg-red-700 text-white leading-none text-center">{hitungRataRata(selectedParticipant.nilai)}</td></tr>
-                    </tfoot>
-                  )}
                 </table>
              </div>
-             <div className="flex justify-between items-start mt-auto text-black font-sans text-left text-left leading-none text-left text-left">
-                <div className="w-[350px] border-l-4 border-black pl-8 text-left leading-none text-left text-left text-left text-left">
-                   <p className="font-black text-xs uppercase mb-4 text-black underline leading-none text-left text-left text-left">Grading Policy:</p>
-                   <table className="text-[11px] font-bold uppercase text-slate-600 leading-none text-left">
-                      <tbody>
-                        <tr className="leading-none text-left"><td className="pr-6 leading-none text-left text-slate-600">86 - 100</td><td className="leading-none text-left text-slate-600">: Excellent (A)</td></tr>
-                        <tr className="leading-none text-left"><td className="pr-6 leading-none text-left text-slate-600">76 - 85</td><td className="leading-none text-left text-slate-600">: Good (B)</td></tr>
-                        <tr className="leading-none text-left"><td className="pr-6 leading-none text-left text-slate-600">50 - 75</td><td className="leading-none text-left text-slate-600">: Average (C)</td></tr>
-                      </tbody>
-                   </table>
+
+             {/* Footer Tanggal & Tanda Tangan */}
+             <div className="flex justify-between items-end mt-auto text-xs font-bold uppercase">
+                <div className="flex flex-col gap-3 pb-6">
+                   <div>TGL. MASUK<span className="inline-block w-8 text-center">:</span>{selectedParticipant.tanggalMulaiBelajar || '.........................'}</div>
+                   <div>TGL. KELUAR<span className="inline-block w-8 text-center">:</span>{selectedParticipant.tanggalKeluar || selectedParticipant.tanggalSelesaiBelajar || '.........................'}</div>
                 </div>
-                <div className="text-center w-[350px] leading-none text-black flex flex-col items-center">
-                   <p className="mb-24 text-[13px] font-bold uppercase text-black text-center text-black">Pangkalan Bun, {new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</p>
-                   <p className="font-black underline underline-offset-8 decoration-4 text-xl uppercase text-black text-center leading-none">Director of Education</p>
+                <div className="text-center w-40 flex flex-col items-center">
+                   <p className="mb-20">MENGETAHUI</p>
+                   <div className="w-full border-b border-black border-dashed"></div>
                 </div>
              </div>
+
           </div>
         </div>
       )}
 
-      {/* --- CSS OVERRIDES FOR PRINT --- */}
+      {/* --- CSS OVERRIDES FOR PRINT (A5 PORTRAIT) --- */}
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 0; }
+          @page { size: A5 portrait; margin: 0; }
           body { background: white !important; margin: 0 !important; padding: 0 !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .print-hidden { display: none !important; }
-          .hidden.print\\:block { display: block !important; }
+          .hidden.print\\:block, .hidden.print\\:flex { display: flex !important; }
         }
       `}</style>
     </>
