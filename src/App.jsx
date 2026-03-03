@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Menu, X, Home, UserPlus, Database, Edit3, 
-  Eye, CheckCircle2, ChevronRight, GraduationCap,
-  Save, BookOpen, Plus, Trash2, Calculator, Award,
-  Info, Printer, Search, Layout, Video, Smartphone,
-  FileText, Presentation, Globe, Mail, Image as ImageIcon,
-  AlertCircle, MapPin, Calendar, Clock, User, ChevronLeft, ArrowRight,
-  Phone, CalendarDays, Filter, Headset, TrendingUp, Users, CheckCircle,
-  FileCheck, Download, CloudUpload, File, ShieldCheck, Camera, Edit
+  Menu, X, Home, UserPlus, Database, Edit, 
+  Eye, BookOpen, Plus, Award, Printer, Search, 
+  Smartphone, Globe, Mail, MapPin, User, ChevronLeft, ArrowRight,
+  Phone, Users, CheckCircle, FileCheck, Download, 
+  CloudUpload, FileText, Camera
 } from 'lucide-react';
 
 // ==========================================
@@ -100,6 +97,13 @@ const getKeterangan = (rataRata) => {
   if (n <= 75) return 'CUKUP';
   if (n <= 85) return 'BAIK';
   return 'SANGAT BAIK';
+};
+
+const getWarnaStatus = (rataRata) => {
+  const n = Number(rataRata);
+  if (n < 50) return 'text-red-600 bg-red-50 border-red-100';
+  if (n <= 75) return 'text-amber-600 bg-amber-50 border-amber-100';
+  return 'text-emerald-600 bg-emerald-50 border-emerald-100';
 };
 
 export default function App() {
@@ -219,7 +223,7 @@ export default function App() {
     const today = new Date();
     setParticipants(participants.map(p => p.id === selectedParticipant.id ? { 
       ...p, nilai: tempNilai, status: 'Lulus',
-      tanggalSelesaiBelajar: today.toLocaleDateString('id-ID'),
+      tanggalKeluar: today.toLocaleDateString('id-ID'),
     } : p));
     setIsNilaiModalOpen(false);
     showNotification("Siswa Dinyatakan Lulus!");
@@ -235,6 +239,8 @@ export default function App() {
     setTimeout(() => { window.print(); }, 400);
   };
 
+  const graduatedParticipants = participants.filter(p => p.status === 'Lulus');
+
   return (
     <>
       <div className="print:hidden min-h-screen bg-slate-50 text-slate-900 font-sans leading-none text-left">
@@ -249,7 +255,7 @@ export default function App() {
           </div>
         )}
 
-        {/* --- HEADER --- */}
+        {/* --- HEADER (LOCATION INCLUDED) --- */}
         <nav className="bg-white/95 backdrop-blur-md px-10 h-28 flex justify-between items-center sticky top-0 z-[100] border-b border-slate-200 shadow-sm leading-none">
           <div className="flex items-center gap-6 cursor-pointer group" onClick={() => setActiveTab('home')}>
              <EnterLogo size="w-16 h-16" />
@@ -275,17 +281,14 @@ export default function App() {
                 <div className="flex flex-col text-left"><span className="text-blue-600 font-black text-[9px] uppercase">KONSULTASI</span><span className="text-slate-900 text-xs font-black mt-1 lowercase">e.serverenter@gmail.com</span></div>
              </div>
 
-             <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm max-w-sm text-black">
+             <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm max-w-[240px] text-black">
                 <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg leading-none shrink-0"><MapPin size={18} /></div>
-                <div className="flex flex-col text-left">
-                   <span className="text-emerald-600 font-black text-[9px] uppercase">LOKASI</span>
-                   <span className="text-slate-900 text-[11px] font-black uppercase mt-1 leading-tight">Jl. P. Diponegoro No. 2C RT. 02, Kel. Sidorejo, Pangkalanbun, Kalimantan Tengah</span>
-                </div>
+                <div className="flex flex-col text-left"><span className="text-emerald-600 font-black text-[9px] uppercase">LOKASI</span><span className="text-slate-900 text-[11px] font-black uppercase mt-1">PANGKALAN BUN</span></div>
              </div>
 
              <button onClick={() => setIsMenuOpen(true)} className="p-4 bg-slate-900 text-white rounded-2xl hover:bg-red-600 transition-all shadow-xl ml-4 flex items-center justify-center text-white"><Menu /></button>
           </div>
-          <button onClick={() => setIsMenuOpen(true)} className="lg:hidden p-4 bg-slate-900 text-white rounded-2xl flex items-center justify-center"><Menu /></button>
+          <button onClick={() => setIsMenuOpen(true)} className="lg:hidden p-4 bg-slate-900 text-white rounded-2xl flex items-center justify-center text-white"><Menu /></button>
         </nav>
 
         {/* SIDEBAR */}
@@ -302,7 +305,7 @@ export default function App() {
               { id: 'home', label: 'Dashboard Utama', icon: <Home />, color: 'bg-indigo-500' },
               { id: 'form', label: 'Registrasi Baru', icon: <UserPlus />, color: 'bg-pink-500' },
               { id: 'database', label: 'Database Siswa', icon: <Database />, color: 'bg-blue-500' },
-              { id: 'input_nilai', label: 'Penilaian Akademik', icon: <Edit3 />, color: 'bg-green-500' },
+              { id: 'input_nilai', label: 'Penilaian Akademik', icon: <Edit />, color: 'bg-green-500' },
               { id: 'certificates', label: 'Archive Sertifikat', icon: <FileCheck />, color: 'bg-amber-500' }
             ].map(item => (
               <button key={item.id} onClick={() => handleNavigation(item.id)} className={`w-full flex items-center space-x-6 p-6 rounded-[2.5rem] transition-all ${activeTab === item.id ? 'bg-slate-100 text-blue-600 shadow-inner' : 'hover:bg-slate-50 text-slate-600 hover:translate-x-2'}`}>
@@ -329,12 +332,12 @@ export default function App() {
                 </div>
                 
                 <div className="flex gap-6">
-                  <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-slate-100 flex flex-col items-center w-48 transition-transform hover:-translate-y-2 text-center">
+                  <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-slate-100 flex flex-col items-center w-48 transition-transform hover:-translate-y-2 leading-none text-center">
                     <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4"><Users /></div>
                     <span className="text-4xl font-black text-slate-800">{participants.filter(p => p.status === 'Aktif').length}</span>
                     <span className="text-[10px] font-black text-slate-400 uppercase mt-2">Siswa Aktif</span>
                   </div>
-                  <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-slate-100 flex flex-col items-center w-48 transition-transform hover:-translate-y-2 text-center">
+                  <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-slate-100 flex flex-col items-center w-48 transition-transform hover:-translate-y-2 leading-none text-center">
                     <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-4"><CheckCircle /></div>
                     <span className="text-4xl font-black text-slate-800">{participants.filter(p => p.status === 'Lulus').length}</span>
                     <span className="text-[10px] font-black text-slate-400 uppercase mt-2">Lulusan</span>
@@ -346,11 +349,11 @@ export default function App() {
                 {[
                   { label: 'Registrasi', icon: <UserPlus />, color: 'bg-orange-500', tab: 'form', desc: 'Siswa Baru' },
                   { label: 'Database', icon: <Database />, color: 'bg-pink-500', tab: 'database', desc: 'Data Master' },
-                  { label: 'Penilaian', icon: <Edit3 />, color: 'bg-blue-500', tab: 'input_nilai', desc: 'Skor & Hasil' },
+                  { label: 'Penilaian', icon: <Edit />, color: 'bg-blue-500', tab: 'input_nilai', desc: 'Skor & Hasil' },
                   { label: 'Sertifikat', icon: <FileCheck />, color: 'bg-amber-500', tab: 'certificates', desc: 'Arsip PDF' },
                   { label: 'Website', icon: <Globe />, color: 'bg-green-500', desc: 'Enter Group' }
                 ].map((btn, i) => (
-                  <div key={i} onClick={() => btn.tab && handleNavigation(btn.tab)} className="group bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm hover:shadow-2xl transition-all cursor-pointer flex flex-col items-center text-center">
+                  <div key={i} onClick={() => btn.tab && handleNavigation(btn.tab)} className="group bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm hover:shadow-2xl transition-all cursor-pointer flex flex-col items-center text-center leading-none">
                     <div className={`${btn.color} p-6 rounded-[2.5rem] text-white shadow-xl group-hover:scale-110 mb-6 leading-none`}>{btn.icon}</div>
                     <span className="text-sm font-black text-slate-800 uppercase tracking-tight mb-2 leading-none">{btn.label}</span>
                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{btn.desc}</span>
@@ -360,7 +363,7 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB FORM (FULL LENGKAP) */}
+          {/* TAB FORM (KEMBALI LENGKAP) */}
           {activeTab === 'form' && (
             <div className="max-w-4xl mx-auto animate-in zoom-in-95 duration-500 text-left">
               <div className="bg-white rounded-[4rem] shadow-2xl border border-slate-100 overflow-hidden text-left leading-none">
@@ -479,10 +482,10 @@ export default function App() {
 
           {/* TAB DATABASE (LIST KONTAK & STATUS) */}
           {activeTab === 'database' && (
-            <div className="animate-in fade-in duration-700 relative text-left leading-none">
+            <div className="animate-in fade-in duration-700 relative text-left leading-none text-left">
               {!selectedCourse ? (
                 <div className="space-y-12 leading-none text-left">
-                  {/* --- AREA PENCARIAN GLOBAL DATABASE --- */}
+                  {/* --- AREA PENCARIAN GLOBAL DATABASE (KEMBALI) --- */}
                   <div className="flex flex-col lg:flex-row justify-between items-center gap-8 bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 text-left">
                     <div className="text-left leading-none">
                       <h2 className="text-4xl font-black text-slate-800 tracking-tighter uppercase mb-3">Master Database</h2>
@@ -559,7 +562,6 @@ export default function App() {
                       </div>
                     </div>
                   ) : (
-                    /* DAFTAR PROGRAM CARDS */
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 leading-none">
                       {PROGRAM_CHOICES.map((course, idx) => {
                         const count = participants.filter(p => p.program === course).length;
@@ -583,12 +585,12 @@ export default function App() {
                   )}
                 </div>
               ) : (
-                /* VIEW DALAM JURUSAN */
                 <div className="bg-white rounded-[4rem] border border-slate-100 shadow-2xl overflow-hidden animate-in slide-in-from-right-8 duration-500 text-left leading-none">
                    <div className="p-12 border-b bg-slate-50/50 flex flex-col md:flex-row justify-between items-center gap-8 leading-none text-left">
                     <div className="flex items-center gap-8 text-left text-black leading-none"><button onClick={() => { setSelectedCourse(null); setSearchQuery(""); }} className="p-4 bg-white rounded-3xl border border-slate-100 text-slate-400 hover:text-red-600 transition-all shadow-md flex items-center justify-center leading-none text-slate-400"><ChevronLeft /></button><div><h2 className="text-2xl font-black text-slate-800 uppercase mb-3 leading-none text-slate-800">{selectedCourse}</h2><p className="text-slate-400 text-xs font-bold uppercase tracking-widest text-left mt-1">Daftar Seluruh Peserta</p></div></div>
                     <div className="flex bg-slate-200 p-2 rounded-[2rem] shadow-inner relative w-64 h-16 leading-none"><div className={`absolute top-2 bottom-2 w-[calc(50%-8px)] bg-white rounded-2xl shadow-lg transition-all duration-300 ${dbCategory === 'Private' ? 'left-[calc(50%+4px)]' : 'left-2'} leading-none`}></div><button onClick={() => setDbCategory("Reguler")} className={`flex-1 relative z-10 font-black text-[11px] uppercase tracking-widest transition-colors ${dbCategory === 'Reguler' ? 'text-slate-900' : 'text-slate-400'} leading-none`}>Reguler</button><button onClick={() => setDbCategory("Private")} className={`flex-1 relative z-10 font-black text-[11px] uppercase tracking-widest transition-colors ${dbCategory === 'Private' ? 'text-slate-900' : 'text-slate-400'} leading-none`}>Private</button></div>
                   </div>
+                  
                   <div className="overflow-x-auto text-left leading-none">
                     <table className="w-full text-left font-sans leading-none text-left"><thead className="bg-white border-b border-slate-50 font-black text-[11px] uppercase text-slate-400 tracking-widest leading-none text-left"><tr><th className="p-12 w-20 leading-none text-slate-400 text-left">No</th><th className="text-left leading-none text-slate-400 text-left">Peserta & Kontak</th><th className="text-center w-32 leading-none text-slate-400 text-center">Aksi</th></tr></thead>
                       <tbody className="divide-y divide-slate-50 leading-none text-left">
@@ -596,7 +598,7 @@ export default function App() {
                           participants.filter(p => p.program === selectedCourse && p.category === dbCategory).map((p, i) => (
                             <tr key={p.id} className="hover:bg-red-50/30 transition-colors group cursor-pointer leading-none text-left" onClick={() => handleOpenDetail(p)}>
                               <td className="p-12 text-slate-300 font-bold font-mono leading-none text-left">{i + 1}</td>
-                              <td className="p-12 flex items-center gap-8 leading-none text-black text-left">
+                              <td className="p-12 flex items-center gap-8 leading-none text-black leading-none text-left text-left">
                                 <div className="w-20 h-20 rounded-[2rem] border-4 border-white shadow-xl bg-slate-100 flex items-center justify-center overflow-hidden leading-none text-left">
                                   {p.photo ? <img src={p.photo} className="w-full h-full object-cover" /> : <img src={IKON_GENDER[p.gender]} className="w-8 h-8 opacity-30 text-left" />}
                                 </div>
@@ -627,7 +629,7 @@ export default function App() {
                               </td>
                             </tr>
                           ))
-                        ) : (<tr><td colSpan="3" className="p-24 text-center font-black text-slate-200 uppercase tracking-widest text-sm italic leading-none text-center">Data Database Kosong</td></tr>)}
+                        ) : (<tr><td colSpan="3" className="p-24 text-center font-black text-slate-200 uppercase tracking-widest text-sm italic leading-none text-center">Data Siswa Tidak Ditemukan</td></tr>)}
                       </tbody>
                     </table>
                   </div>
@@ -638,10 +640,10 @@ export default function App() {
 
           {/* TAB PENILAIAN & KELULUSAN */}
           {activeTab === 'input_nilai' && (
-            <div className="animate-in fade-in duration-700 relative text-left leading-none">
+            <div className="animate-in fade-in duration-700 relative text-left leading-none text-left">
               {!selectedGradCourse ? (
                 <div className="space-y-12 text-left">
-                  {/* --- AREA PENCARIAN GLOBAL ALUMNI --- */}
+                  {/* --- AREA PENCARIAN GLOBAL ALUMNI (KEMBALI) --- */}
                   <div className="flex flex-col lg:flex-row justify-between items-center gap-8 bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 text-left">
                     <div className="text-left leading-none">
                       <h2 className="text-4xl font-black text-slate-800 tracking-tighter uppercase mb-3">Penilaian Akademik</h2>
@@ -704,7 +706,6 @@ export default function App() {
                       </div>
                     </div>
                   ) : (
-                    /* DAFTAR PROGRAM CARDS ALUMNI */
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 leading-none">
                       {PROGRAM_CHOICES.map((course, idx) => {
                         const count = participants.filter(p => p.program === course && p.status === 'Lulus').length;
@@ -725,9 +726,9 @@ export default function App() {
                   )}
                 </div>
               ) : (
-                /* VIEW DALAM JURUSAN ALUMNI */
                 <div className="bg-white rounded-[4rem] border border-slate-100 shadow-2xl overflow-hidden leading-none text-left animate-in slide-in-from-right-8 duration-500 text-left">
                    <div className="p-12 border-b bg-slate-50/50 flex flex-col md:flex-row justify-between items-center gap-8 text-black leading-none text-left"><div className="flex items-center gap-8 text-left text-black"><button onClick={() => { setSelectedGradCourse(null); setSearchQuery(""); }} className="p-4 bg-white rounded-3xl border border-slate-100 text-slate-400 hover:text-amber-600 transition-all shadow-md flex items-center justify-center leading-none text-slate-400"><ChevronLeft /></button><div><h2 className="text-3xl font-black text-slate-800 uppercase mb-3 text-left text-slate-800">{selectedGradCourse}</h2><p className="text-slate-400 text-xs font-bold uppercase tracking-widest text-left">Database Siswa Lulus</p></div></div></div>
+
                    <div className="overflow-x-auto leading-none">
                         <table className="w-full text-left font-sans leading-none text-left"><thead className="bg-white border-b border-slate-50 font-black text-[11px] uppercase text-slate-400 tracking-widest leading-none text-left"><tr><th className="p-12 w-20 leading-none text-slate-400 text-left">No</th><th className="text-left leading-none text-slate-400 text-left">Nama Peserta</th><th className="text-center leading-none text-slate-400 text-center">AVG Score</th><th className="text-center w-40 leading-none text-slate-400 text-center">Print</th></tr></thead><tbody className="divide-y divide-slate-50 leading-none text-left">
                         {participants.filter(p => p.status === 'Lulus' && p.program === selectedGradCourse).map((p, i) => (
@@ -737,7 +738,7 @@ export default function App() {
                 </div>
               )}
               
-              {/* --- FLOAT ACTION BUTTONS --- */}
+              {/* --- FLOAT ACTION BUTTONS (TOMBOL PLUS KEMBALI) --- */}
               <div className="fixed bottom-12 right-12 flex flex-col items-center gap-5 z-[80] group leading-none text-left">
                   <div className="flex flex-col items-center opacity-0 group-hover:opacity-100 transition-all translate-y-4 group-hover:translate-y-0 leading-none">
                     <button onClick={() => showNotification("Fitur Download Sedang Dalam Pengembangan")} className="w-14 h-14 bg-slate-900 text-white rounded-full shadow-xl flex items-center justify-center border-4 border-white shadow-slate-200 group/btn relative">
@@ -761,7 +762,7 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB ARSIP SERTIFIKAT */}
+          {/* TAB ARSIP SERTIFIKAT (STABIL) */}
           {activeTab === 'certificates' && (
              <div className="animate-in fade-in leading-none text-left">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-12 gap-8 text-left leading-none text-left">
@@ -771,7 +772,7 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 leading-none">
                   {certificates.map(cert => (
                     <div key={cert.id} className="bg-white rounded-[3rem] p-8 border border-slate-100 shadow-sm hover:shadow-2xl transition-all group flex flex-col items-center text-center leading-none text-left">
-                      <div className="w-20 h-20 bg-slate-50 text-red-500 rounded-[2rem] flex items-center justify-center mb-6 border-2 border-slate-50 group-hover:bg-red-500 group-hover:text-white transition-all shadow-sm leading-none text-red-500 text-left"><File size={32} /></div>
+                      <div className="w-20 h-20 bg-slate-50 text-red-500 rounded-[2rem] flex items-center justify-center mb-6 border-2 border-slate-50 group-hover:bg-red-500 group-hover:text-white transition-all shadow-sm leading-none text-red-500 text-left"><FileText size={32} /></div>
                       <h3 className="font-black text-slate-800 uppercase text-center text-sm mb-2 leading-tight h-10 flex items-center leading-none text-center text-slate-800 text-left">{cert.namaSiswa}</h3>
                       <p className="text-[9px] font-bold text-slate-400 uppercase mb-4 leading-none text-center">{cert.program}</p>
                       <div className="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6 flex flex-col items-center text-center leading-none text-left">
