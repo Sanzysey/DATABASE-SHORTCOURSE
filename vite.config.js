@@ -7,4 +7,6 @@ export default defineConfig({
     tailwindcss(),
     react(),
   ],
+  // PENTING: Ganti "sistem-enter" di bawah ini dengan nama Repository GitHub Bapak
+  base: '/sistem-enter/', 
 })
