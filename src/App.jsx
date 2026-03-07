@@ -14,7 +14,7 @@ import {
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 // ==========================================
 // 1. ASSET & KONFIGURASI (STABIL)
@@ -114,7 +114,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [message, setMessage] = useState(null);
-  const [isImporting, setIsImporting] = useState(false); // State untuk loading Import
+  const [isImporting, setIsImporting] = useState(false); 
   
   // State untuk Database Hierarchy
   const [dbViewStatus, setDbViewStatus] = useState(null);
@@ -127,6 +127,7 @@ export default function App() {
   const [participants, setParticipants] = useState([]);
 
   const [selectedParticipant, setSelectedParticipant] = useState(null);
+  const [participantToDelete, setParticipantToDelete] = useState(null); 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [isNilaiModalOpen, setIsNilaiModalOpen] = useState(false);
@@ -136,16 +137,13 @@ export default function App() {
   // State untuk Absensi
   const [selectedAbsensiCourse, setSelectedAbsensiCourse] = useState(null);
 
-  // Kategori Absensi otomatis dari activeTab
   const currentAbsensiCategory = activeTab === 'absensi_reguler' ? 'Reguler' : (activeTab === 'absensi_private' ? 'Private' : null);
   const isReguler = currentAbsensiCategory === 'Reguler';
 
-  // State Baru untuk Absensi Reguler (Sistem Form Harian)
   const [piketReguler, setPiketReguler] = useState("");
   const [selectedStudentForAbsen, setSelectedStudentForAbsen] = useState("");
   const [dailyAttendees, setDailyAttendees] = useState([]);
 
-  // Data Terfilter untuk Absensi Reguler
   const activeRegulerParticipants = participants
       .filter(p => p.status === 'Aktif' && p.category === 'Reguler')
       .sort((a, b) => a.nama.localeCompare(b.nama));
@@ -189,7 +187,6 @@ export default function App() {
     setActiveTab(tab); 
     setIsMenuOpen(false); 
     
-    // Reset State Tab Lainnya
     setDbViewStatus(null);
     setDbViewProgram(null);
     setDbViewCategory(null);
@@ -198,9 +195,9 @@ export default function App() {
     setIsEditProfileModalOpen(false);
     setIsNilaiModalOpen(false);
     setSelectedParticipant(null);
+    setParticipantToDelete(null);
     setSearchQuery("");
 
-    // Reset Form Absensi Reguler
     setDailyAttendees([]);
     setPiketReguler("");
     setSelectedStudentForAbsen("");
@@ -299,6 +296,24 @@ export default function App() {
     }
   };
 
+  const confirmDeleteParticipant = (p) => {
+    setParticipantToDelete(p);
+  };
+
+  const handleDeleteParticipant = async () => {
+    if (!user || !participantToDelete) return;
+    
+    try {
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'participants', participantToDelete.id);
+      await deleteDoc(docRef);
+      showNotification("Data Siswa Berhasil Dihapus Permanen!");
+      setParticipantToDelete(null);
+    } catch (err) {
+      console.error(err);
+      showNotification("Gagal menghapus data.");
+    }
+  };
+
   const handleOpenNilai = (p) => {
     setSelectedParticipant(p);
     if (p.nilai && p.nilai.length > 0) {
@@ -360,9 +375,6 @@ export default function App() {
     setTimeout(() => { window.print(); }, 400);
   };
 
-  // ==========================================
-  // FITUR BARU: IMPORT CSV OTOMATIS
-  // ==========================================
   const handleImportCSV = (e) => {
     const file = e.target.files[0];
     if(!file || !user) return;
@@ -374,18 +386,17 @@ export default function App() {
     reader.onload = async (event) => {
        const text = event.target.result;
        const lines = text.split('\n');
-       
        let importedCount = 0;
        
-       // Mulai dari i=1 untuk melewati baris judul (header) di CSV
        for(let i = 1; i < lines.length; i++) {
            if(!lines[i].trim()) continue;
            
-           // Regex untuk memisahkan data CSV yang dipisahkan koma, 
-           // tanpa memisahkan koma yang ada di dalam tanda kutip ganda (")
            const values = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+           const rawNama = values[1] ? values[1].replace(/"/g, '').trim() : "";
            
-           // Penyesuaian Nama Program dari CSV ke Format Sistem
+           // FILTER: Jangan import baris yang namanya kosong (mencegah blank data error)
+           if (!rawNama || rawNama === "") continue; 
+
            const rawProgram = values[5] ? values[5].replace(/"/g, '').trim() : "";
            let program = rawProgram;
            const rawLower = rawProgram.toLowerCase();
@@ -395,15 +406,13 @@ export default function App() {
            else if (rawLower.includes("excel")) program = "Microsoft Office Excel (20x Pertemuan)";
            else if (rawLower.includes("design grafis") || rawLower.includes("desain grafis")) program = "Desain Grafis (24x Pertemuan)";
            
-           // Penyesuaian Status
            let rawStatus = values[7] ? values[7].replace(/"/g, '').trim() : "";
            let status = "Aktif";
            if(rawStatus.toLowerCase() === 'selesai' || rawStatus.toLowerCase() === 'lulus') status = "Lulus";
            
-           // Membuat Objek Peserta Sesuai Format Firebase Sistem
            const newParticipant = {
                nik: "",
-               nama: values[1] ? values[1].replace(/"/g, '').trim() : "",
+               nama: rawNama,
                tempatLahir: values[2] ? values[2].replace(/"/g, '').trim() : "",
                tanggalLahir: values[3] ? values[3].replace(/"/g, '').trim() : "",
                gender: values[4] ? values[4].replace(/"/g, '').trim() : "",
@@ -411,7 +420,7 @@ export default function App() {
                telepon: values[8] ? values[8].replace(/"/g, '').trim() : "",
                email: "",
                alamat: "",
-               program: program || "Microsoft Office Basic (12x Pertemuan)", // fallback aman
+               program: program || "Microsoft Office Basic (12x Pertemuan)", 
                category: values[9] ? values[9].replace(/"/g, '').trim() : "Reguler",
                jamBelajar: "",
                tanggalMulaiBelajar: values[10] ? values[10].replace(/"/g, '').trim() : "",
@@ -425,7 +434,6 @@ export default function App() {
            };
 
            try {
-              // Simpan langsung ke Firebase
               await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'participants'), newParticipant);
               importedCount++;
            } catch(err) {
@@ -435,15 +443,12 @@ export default function App() {
        
        setIsImporting(false);
        showNotification(`Sukses! ${importedCount} data siswa berhasil diimpor.`);
-       e.target.value = null; // Reset input file agar bisa import file yang sama lagi jika perlu
-       setActiveTab('database'); // Arahkan ke database untuk melihat hasilnya
+       e.target.value = null; 
+       setActiveTab('database'); 
     };
     reader.readAsText(file);
   };
 
-  // ==========================================
-  // LOGIKA ABSENSI REGULER (DENGAN MANUAL BACKFILL)
-  // ==========================================
   const handleAddDailyAttendee = () => {
       if(!selectedStudentForAbsen) return;
       const student = participants.find(p => p.id === selectedStudentForAbsen);
@@ -626,7 +631,6 @@ export default function App() {
     setTimeout(() => showNotification("Laporan CSV Berhasil Diunduh!"), 1500);
   };
 
-  // Definisi Item Navigasi yang digunakan di Desktop Sidebar & Mobile Drawer
   const NAV_ITEMS = [
     { id: 'home', label: 'Dashboard Utama', icon: <Home size={18} />, color: 'bg-blue-600 text-white' },
     { id: 'form', label: 'Registrasi Baru', icon: <UserPlus size={18} />, color: 'bg-orange-500 text-white' },
@@ -651,7 +655,7 @@ export default function App() {
         )}
 
         {/* --- TOP BAR INFO KONTAK (FULL WIDTH) --- */}
-        <div className="w-full bg-slate-900 text-slate-300 py-2.5 px-4 sm:px-6 lg:px-8 text-xs sm:text-sm border-b border-slate-800 z-50">
+        <div className="w-full bg-slate-900 text-slate-300 py-2.5 px-4 sm:px-6 lg:px-8 text-xs sm:text-sm border-b border-slate-800">
           <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-center gap-3 md:gap-6">
             
             {/* Bagian Alamat (Running Text) */}
@@ -707,9 +711,9 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Tombol Hamburger Tampilan HP (Desktop Disembunyikan karena ada Sidebar Kiri) */}
+              {/* Tombol Hamburger Tampilan HP */}
               <div className="flex items-center lg:hidden shrink-0 ml-4">
-                <button onClick={() => setIsMenuOpen(true)} className="p-2.5 text-slate-600 hover:bg-slate-100 rounded-xl bg-slate-50 border border-slate-200 active:scale-95 transition-transform">
+                <button onClick={() => setIsMenuOpen(true)} className="p-2.5 text-slate-600 hover:bg-slate-100 rounded-xl bg-slate-50 border border-slate-200 active:scale-95 transition-transform cursor-pointer">
                   <Menu size={24} className="shrink-0" />
                 </button>
               </div>
@@ -722,7 +726,7 @@ export default function App() {
         <div className="flex w-full max-w-[1600px] mx-auto items-start">
           
           {/* SIDEBAR KIRI (Hanya muncul di Desktop / Layar Lebar) */}
-          <aside className="hidden lg:flex flex-col w-[280px] shrink-0 sticky top-[125px] h-[calc(100vh-125px)] overflow-y-auto p-6 bg-transparent border-r border-slate-200 border-dashed">
+          <aside className="hidden lg:flex flex-col w-[280px] shrink-0 sticky top-[125px] h-[calc(100vh-125px)] overflow-y-auto p-6 bg-transparent border-r border-slate-200 border-dashed z-40">
              <div className="mb-6 px-2">
                 <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Navigasi Admin</h2>
              </div>
@@ -731,7 +735,7 @@ export default function App() {
                  <button 
                    key={item.id} 
                    onClick={() => handleNavigation(item.id)} 
-                   className={`flex items-center gap-4 p-3.5 rounded-2xl transition-all duration-300 w-full text-left group ${activeTab === item.id ? 'bg-white shadow-md border border-slate-100 translate-x-1' : 'hover:bg-slate-200/50 border border-transparent hover:translate-x-1'}`}
+                   className={`flex items-center gap-4 p-3.5 rounded-2xl transition-all duration-300 w-full text-left group cursor-pointer ${activeTab === item.id ? 'bg-white shadow-md border border-slate-100 translate-x-1' : 'hover:bg-slate-200/50 border border-transparent hover:translate-x-1'}`}
                  >
                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-sm ${activeTab === item.id ? item.color : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-blue-600'}`}>
                      {item.icon}
@@ -762,11 +766,11 @@ export default function App() {
                  <h2 className="text-base sm:text-lg font-black text-slate-800 uppercase tracking-tighter truncate">NAVIGASI SISTEM</h2>
                  <p className="text-[8px] sm:text-[9px] font-bold text-blue-600 uppercase tracking-widest mt-1 truncate">Enter Training Center</p>
               </div>
-              <button onClick={() => setIsMenuOpen(false)} className="p-2 sm:p-2.5 bg-slate-50 hover:bg-red-600 hover:text-white transition-all rounded-xl flex items-center justify-center text-slate-400 shrink-0 ml-2"><X size={20} className="shrink-0" /></button>
+              <button onClick={() => setIsMenuOpen(false)} className="p-2 sm:p-2.5 bg-slate-50 hover:bg-red-600 hover:text-white transition-all rounded-xl flex items-center justify-center text-slate-400 shrink-0 ml-2 cursor-pointer"><X size={20} className="shrink-0" /></button>
             </div>
             <div className="px-4 sm:px-6 py-6 space-y-3 sm:space-y-4 text-left overflow-y-auto max-h-[calc(100vh-100px)]">
               {NAV_ITEMS.map(item => (
-                <button key={item.id} onClick={() => handleNavigation(item.id)} className={`w-full flex items-center space-x-4 p-3.5 sm:p-4 rounded-2xl sm:rounded-[2rem] transition-all ${activeTab === item.id ? 'bg-slate-100 text-blue-600 shadow-inner' : 'hover:bg-slate-50 text-slate-600'}`}>
+                <button key={item.id} onClick={() => handleNavigation(item.id)} className={`w-full flex items-center space-x-4 p-3.5 sm:p-4 rounded-2xl sm:rounded-[2rem] transition-all cursor-pointer ${activeTab === item.id ? 'bg-slate-100 text-blue-600 shadow-inner' : 'hover:bg-slate-50 text-slate-600'}`}>
                   <div className={`${item.color} p-2.5 sm:p-3 rounded-xl text-white shadow-md shrink-0`}>{item.icon}</div>
                   <span className="font-black uppercase text-[10px] sm:text-xs tracking-widest leading-none text-left min-w-0 truncate">{item.label}</span>
                 </button>
@@ -783,7 +787,6 @@ export default function App() {
                 
                 {/* Banner Section Premium */}
                 <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-12 shadow-xl sm:shadow-2xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 sm:gap-8 border border-slate-800">
-                   {/* Dekorasi Background */}
                    <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
                    <div className="absolute bottom-0 left-10 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl translate-y-1/2 pointer-events-none"></div>
 
@@ -839,7 +842,7 @@ export default function App() {
                    <div className="lg:col-span-2 bg-white p-5 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-slate-200 shadow-sm flex flex-col min-w-0">
                       <div className="flex justify-between items-center mb-4 sm:mb-6 gap-2">
                          <h3 className="text-[10px] sm:text-sm font-black text-slate-800 uppercase tracking-widest truncate">Pendaftaran Terbaru</h3>
-                         <button onClick={() => handleNavigation('database')} className="text-[8px] sm:text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-800 flex items-center gap-1 transition-colors shrink-0">Lihat Semua <ChevronRight size={14} className="shrink-0" /></button>
+                         <button onClick={() => handleNavigation('database')} className="text-[8px] sm:text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-800 flex items-center gap-1 transition-colors shrink-0 cursor-pointer">Lihat Semua <ChevronRight size={14} className="shrink-0" /></button>
                       </div>
                       <div className="flex flex-col gap-2 sm:gap-3 flex-grow">
                          {participants.slice(0, 4).map((p, i) => (
@@ -880,7 +883,7 @@ export default function App() {
                              </p>
                           </div>
                           <div className="relative z-10">
-                             <button onClick={() => handleNavigation('form')} className="w-full py-3 sm:py-4 bg-white text-blue-700 rounded-xl sm:rounded-2xl font-black text-[9px] sm:text-xs uppercase tracking-widest hover:bg-blue-50 transition-all shadow-md active:scale-95 text-center shrink-0">
+                             <button onClick={() => handleNavigation('form')} className="w-full py-3 sm:py-4 bg-white text-blue-700 rounded-xl sm:rounded-2xl font-black text-[9px] sm:text-xs uppercase tracking-widest hover:bg-blue-50 transition-all shadow-md active:scale-95 text-center shrink-0 cursor-pointer block">
                                 + Input Data Siswa
                              </button>
                           </div>
@@ -916,7 +919,7 @@ export default function App() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8 text-left leading-none w-full">
                       <div className="space-y-2 sm:space-y-3 w-full">
                          <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Jenis Kelamin</label>
-                         <select name="gender" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px]">
+                         <select name="gender" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] cursor-pointer">
                             <option value="">-- Pilih Jenis Kelamin --</option>
                             <option value="Laki-laki">Laki-laki</option>
                             <option value="Perempuan">Perempuan</option>
@@ -924,7 +927,7 @@ export default function App() {
                       </div>
                       <div className="space-y-2 sm:space-y-3 w-full">
                          <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Agama</label>
-                         <select name="agama" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px]">
+                         <select name="agama" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] cursor-pointer">
                             <option value="">-- Pilih Agama --</option>
                             {DAFTAR_AGAMA.map(a => <option key={a} value={a}>{a}</option>)}
                          </select>
@@ -940,10 +943,10 @@ export default function App() {
                     </div>
                     <hr className="my-5 sm:my-10 border-slate-200 border-dashed w-full" />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8 text-left leading-none w-full">
-                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Program Kursus</label><select name="program" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px]"><option value="">-- Pilih Jurusan --</option>{PROGRAM_CHOICES.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Program Kursus</label><select name="program" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] cursor-pointer"><option value="">-- Pilih Jurusan --</option>{PROGRAM_CHOICES.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
                       <div className="space-y-2 sm:space-y-3 w-full">
                          <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Kategori Kelas</label>
-                         <select name="category" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px]">
+                         <select name="category" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] cursor-pointer">
                             <option value="">-- Pilih Kategori --</option>
                             <option value="Reguler">Reguler</option>
                             <option value="Private">Private</option>
@@ -953,14 +956,17 @@ export default function App() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8 text-left leading-none w-full">
                       <div className="space-y-2 sm:space-y-3 w-full">
                          <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Jam Belajar</label>
-                         <select name="jamBelajar" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px]">
+                         <select name="jamBelajar" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] cursor-pointer">
                             <option value="">-- Pilih Jam --</option>
                             {JAM_BELAJAR_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
                          </select>
                       </div>
                       <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Tanggal Mulai</label><input name="tanggalMulaiBelajar" required type="date" className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold outline-none text-black text-xs sm:text-base transition-shadow min-h-[44px]" /></div>
                     </div>
-                    <button type="submit" className="w-full py-4 sm:py-7 bg-blue-600 text-white font-black rounded-xl sm:rounded-[2.5rem] shadow-xl hover:bg-blue-700 active:scale-95 transition-all uppercase tracking-widest text-[10px] sm:text-[11px] leading-none text-center mt-2 sm:mt-0 shrink-0 block">Hantar Pendaftaran</button>
+                    
+                    <div className="w-full pt-4">
+                      <button type="submit" className="w-full py-4 sm:py-7 bg-blue-600 text-white font-black rounded-xl sm:rounded-[2.5rem] shadow-xl hover:bg-blue-700 active:scale-95 transition-all uppercase tracking-widest text-[10px] sm:text-[11px] leading-none text-center shrink-0 block cursor-pointer">Hantar Pendaftaran</button>
+                    </div>
                   </form>
                 </div>
               </div>
@@ -968,7 +974,7 @@ export default function App() {
 
             {/* TAB DATABASE HIERARKI */}
             {activeTab === 'database' && (
-              <div className="animate-in fade-in duration-700 relative text-left leading-none text-left w-full min-w-0">
+              <div className="animate-in fade-in duration-700 text-left leading-none text-left w-full min-w-0">
                 
                 {/* Level 0: Pilih Status */}
                 {!dbViewStatus && (
@@ -999,7 +1005,7 @@ export default function App() {
                 {dbViewStatus && !dbViewProgram && (
                    <div className="space-y-5 sm:space-y-8 animate-in slide-in-from-right-8 duration-500 w-full min-w-0">
                       <div className="flex items-center gap-3 sm:gap-6 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm shrink-0 min-w-0 w-full">
-                         <button onClick={() => setDbViewStatus(null)} className="p-2.5 sm:p-3 bg-slate-50 rounded-xl hover:bg-blue-100 hover:text-blue-600 transition-colors text-slate-400 border border-slate-200 shrink-0"><ChevronLeft size={18} className="sm:w-5 sm:h-5 shrink-0" /></button>
+                         <button onClick={() => setDbViewStatus(null)} className="p-2.5 sm:p-3 bg-slate-50 rounded-xl hover:bg-blue-100 hover:text-blue-600 transition-colors text-slate-400 border border-slate-200 shrink-0 cursor-pointer"><ChevronLeft size={18} className="sm:w-5 sm:h-5 shrink-0" /></button>
                          <div className="min-w-0 flex-1">
                             <p className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 truncate">Direktori Status</p>
                             <h2 className="text-lg sm:text-2xl font-black text-slate-800 uppercase tracking-tight truncate">{dbViewStatus}</h2>
@@ -1025,7 +1031,7 @@ export default function App() {
                 {dbViewStatus && dbViewProgram && !dbViewCategory && (
                    <div className="space-y-5 sm:space-y-8 animate-in slide-in-from-right-8 duration-500 w-full min-w-0">
                       <div className="flex items-center gap-3 sm:gap-6 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm shrink-0 min-w-0 w-full">
-                         <button onClick={() => setDbViewProgram(null)} className="p-2.5 sm:p-3 bg-slate-50 rounded-xl hover:bg-blue-100 hover:text-blue-600 transition-colors text-slate-400 border border-slate-200 shrink-0"><ChevronLeft size={18} className="sm:w-5 sm:h-5 shrink-0" /></button>
+                         <button onClick={() => setDbViewProgram(null)} className="p-2.5 sm:p-3 bg-slate-50 rounded-xl hover:bg-blue-100 hover:text-blue-600 transition-colors text-slate-400 border border-slate-200 shrink-0 cursor-pointer"><ChevronLeft size={18} className="sm:w-5 sm:h-5 shrink-0" /></button>
                          <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 sm:gap-3 mb-1 min-w-0">
                                <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">{dbViewStatus}</span>
@@ -1036,28 +1042,30 @@ export default function App() {
                       </div>
                       
                       <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-6 max-w-4xl mx-auto w-full">
-                         <div onClick={() => setDbViewCategory('Reguler')} className="flex-1 bg-gradient-to-br from-blue-500 to-blue-700 text-white p-8 sm:p-12 rounded-[2rem] sm:rounded-[3rem] shadow-lg hover:shadow-2xl hover:shadow-blue-500/40 hover:-translate-y-1 sm:hover:-translate-y-2 transition-all duration-300 cursor-pointer flex flex-col items-center text-center gap-3 sm:gap-4 border-2 sm:border-4 border-white relative overflow-hidden group w-full">
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
-                            <Users size={48} className="sm:w-[64px] sm:h-[64px] opacity-90 mb-1 sm:mb-2 relative z-10 shrink-0" />
-                            <h3 className="text-xl sm:text-3xl font-black uppercase tracking-widest relative z-10">REGULER</h3>
-                            <p className="text-[9px] sm:text-sm font-bold text-blue-100 uppercase tracking-widest relative z-10">Kelas Berkelompok</p>
+                         <div onClick={() => setDbViewCategory('Reguler')} className="flex-1 bg-gradient-to-br from-blue-500 to-blue-700 text-white p-8 sm:p-12 rounded-[2rem] sm:rounded-[3rem] shadow-lg hover:shadow-2xl hover:shadow-blue-500/40 hover:-translate-y-1 sm:hover:-translate-y-2 transition-all duration-300 cursor-pointer flex flex-col items-center text-center gap-3 sm:gap-4 border-2 sm:border-4 border-white overflow-hidden group w-full">
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors pointer-events-none"></div>
+                            <Users size={48} className="sm:w-[64px] sm:h-[64px] opacity-90 mb-1 sm:mb-2 shrink-0" />
+                            <h3 className="text-xl sm:text-3xl font-black uppercase tracking-widest">REGULER</h3>
+                            <p className="text-[9px] sm:text-sm font-bold text-blue-100 uppercase tracking-widest">Kelas Berkelompok</p>
                          </div>
-                         <div onClick={() => setDbViewCategory('Private')} className="flex-1 bg-gradient-to-br from-purple-500 to-purple-700 text-white p-8 sm:p-12 rounded-[2rem] sm:rounded-[3rem] shadow-lg hover:shadow-2xl hover:shadow-purple-500/40 hover:-translate-y-1 sm:hover:-translate-y-2 transition-all duration-300 cursor-pointer flex flex-col items-center text-center gap-3 sm:gap-4 border-2 sm:border-4 border-white relative overflow-hidden group w-full">
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
-                            <User size={48} className="sm:w-[64px] sm:h-[64px] opacity-90 mb-1 sm:mb-2 relative z-10 shrink-0" />
-                            <h3 className="text-xl sm:text-3xl font-black uppercase tracking-widest relative z-10">PRIVATE</h3>
-                            <p className="text-[9px] sm:text-sm font-bold text-purple-100 uppercase tracking-widest relative z-10">Kelas Perorangan</p>
+                         <div onClick={() => setDbViewCategory('Private')} className="flex-1 bg-gradient-to-br from-purple-500 to-purple-700 text-white p-8 sm:p-12 rounded-[2rem] sm:rounded-[3rem] shadow-lg hover:shadow-2xl hover:shadow-purple-500/40 hover:-translate-y-1 sm:hover:-translate-y-2 transition-all duration-300 cursor-pointer flex flex-col items-center text-center gap-3 sm:gap-4 border-2 sm:border-4 border-white overflow-hidden group w-full">
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors pointer-events-none"></div>
+                            <User size={48} className="sm:w-[64px] sm:h-[64px] opacity-90 mb-1 sm:mb-2 shrink-0" />
+                            <h3 className="text-xl sm:text-3xl font-black uppercase tracking-widest">PRIVATE</h3>
+                            <p className="text-[9px] sm:text-sm font-bold text-purple-100 uppercase tracking-widest">Kelas Perorangan</p>
                          </div>
                       </div>
                    </div>
                 )}
 
-                {/* Level 3: Table Peserta */}
+                {/* Level 3: Table Peserta (DIRUBAH JADI FLEX LIST ANTI-GESER) */}
                 {dbViewStatus && dbViewProgram && dbViewCategory && (
                    <div className="space-y-5 sm:space-y-8 animate-in slide-in-from-right-8 duration-500 w-full min-w-0">
+                      
+                      {/* Navigasi Atas Tabel */}
                       <div className="flex flex-col lg:flex-row lg:items-center gap-4 sm:gap-6 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm shrink-0 min-w-0 w-full">
                          <div className="flex items-center gap-3 sm:gap-6 min-w-0 flex-1">
-                             <button onClick={() => setDbViewCategory(null)} className="p-2.5 sm:p-3 bg-slate-50 rounded-xl hover:bg-blue-100 hover:text-blue-600 transition-colors text-slate-400 border border-slate-200 shrink-0"><ChevronLeft size={18} className="sm:w-5 sm:h-5 shrink-0" /></button>
+                             <button onClick={() => setDbViewCategory(null)} className="p-2.5 sm:p-3 bg-slate-50 rounded-xl hover:bg-blue-100 hover:text-blue-600 transition-colors text-slate-400 border border-slate-200 shrink-0 cursor-pointer"><ChevronLeft size={18} className="sm:w-5 sm:h-5 shrink-0" /></button>
                              <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-1 min-w-0">
                                    <span className="text-[7px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">{dbViewStatus}</span>
@@ -1068,71 +1076,83 @@ export default function App() {
                              </div>
                          </div>
                          {/* Pencarian */}
-                         <div className="relative w-full lg:w-64 xl:w-80 shrink-0">
-                            <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-slate-400 shrink-0" size={16} />
+                         <div className="w-full lg:w-64 xl:w-80 shrink-0 relative">
+                            <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-slate-400 shrink-0 pointer-events-none" size={16} />
                             <input type="text" placeholder="Cari Nama Siswa..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="appearance-none w-full pl-10 sm:pl-12 pr-4 py-3 sm:py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition-all focus:shadow-md" />
                          </div>
                       </div>
 
-                      <div className="bg-white rounded-2xl sm:rounded-[3rem] border border-slate-200 shadow-xl overflow-hidden text-left leading-none w-full min-w-0">
-                        <div className="overflow-x-auto text-left leading-none pb-2 sm:pb-0 min-h-[200px] md:min-h-[400px] w-full">
-                          <table className="w-full text-left font-sans leading-none min-w-[600px]">
-                            <thead className="bg-slate-100 border-b border-slate-200 font-black text-[9px] sm:text-[11px] uppercase text-slate-500 tracking-widest leading-none">
-                              <tr>
-                                <th className="p-4 sm:p-8 w-12 sm:w-20 text-center shrink-0">No</th>
-                                <th className="p-4 sm:p-8 min-w-[200px]">Profil Siswa & Kontak</th>
-                                <th className="p-4 sm:p-8 text-center w-28 sm:w-32 shrink-0">Status</th>
-                                <th className="p-4 sm:p-8 text-center w-48 sm:w-64 shrink-0">Manajemen Data</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 leading-none">
-                              {(() => {
-                                  const filteredDb = participants.filter(p => {
-                                      return p.status === dbViewStatus && 
-                                             p.program === dbViewProgram && 
-                                             p.category === dbViewCategory &&
-                                             p.nama.toLowerCase().includes(searchQuery.toLowerCase());
-                                  });
+                      {/* LIST PESERTA RESPONSIVE (PENGGANTI TABEL) */}
+                      <div className="bg-white rounded-2xl sm:rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden text-left w-full min-w-0 flex flex-col">
+                        
+                        {/* Header List Desktop */}
+                        <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-4 bg-slate-100 border-b border-slate-200 font-black text-[10px] uppercase text-slate-500 tracking-widest items-center shrink-0">
+                           <div className="col-span-1 text-center">No</div>
+                           <div className="col-span-6 lg:col-span-5 px-2">Profil Siswa & Kontak</div>
+                           <div className="col-span-2 text-center">Status</div>
+                           <div className="col-span-3 lg:col-span-4 text-right pr-4">Manajemen Data</div>
+                        </div>
 
-                                  if (filteredDb.length === 0) {
-                                      return <tr><td colSpan="4" className="p-12 sm:p-32 text-center flex flex-col items-center justify-center border-none"><Database size={40} className="sm:w-12 sm:h-12 text-slate-200 mb-3 sm:mb-4 shrink-0"/><span className="font-black text-slate-400 uppercase tracking-widest text-[10px] sm:text-sm">Data Siswa Tidak Ditemukan</span></td></tr>;
-                                  }
+                        {/* Body List */}
+                        <div className="flex flex-col divide-y divide-slate-100 min-h-[300px]">
+                           {(() => {
+                               const filteredDb = participants.filter(p => {
+                                   return p.status === dbViewStatus && 
+                                          p.program === dbViewProgram && 
+                                          p.category === dbViewCategory &&
+                                          p.nama.toLowerCase().includes(searchQuery.toLowerCase());
+                               });
 
-                                  return filteredDb.map((p, i) => (
-                                     <tr key={p.id} className="hover:bg-blue-50/50 transition-colors group">
-                                        <td className="p-4 sm:p-8 text-slate-400 font-bold font-mono text-center text-xs sm:text-base shrink-0">{i + 1}</td>
-                                        <td className="p-4 sm:p-8 flex items-center gap-3 sm:gap-6 cursor-pointer min-w-0" onClick={() => handleOpenDetail(p)}>
-                                          <div className="w-10 h-10 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm bg-white flex items-center justify-center overflow-hidden shrink-0 group-hover:border-blue-300 transition-colors">
-                                            {p.photo ? <img src={p.photo} className="w-full h-full object-cover shrink-0" /> : <img src={IKON_GENDER[p.gender]} className="w-5 h-5 sm:w-8 sm:h-8 opacity-30 shrink-0" />}
-                                          </div>
-                                          <div className="flex flex-col gap-1.5 sm:gap-2 min-w-0 flex-1">
-                                             <div className="flex items-center gap-3 min-w-0">
-                                                <span className="text-xs sm:text-base font-black uppercase text-slate-800 group-hover:text-blue-700 transition-colors truncate w-full">{p.nama}</span>
-                                             </div>
-                                             <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-[8px] sm:text-[10px] font-bold text-slate-500 min-w-0">
-                                                <span className="flex items-center gap-1.5 sm:gap-2 bg-slate-100 px-2 py-1 sm:px-2.5 rounded-md border border-slate-200 w-fit shrink-0"><img src={LOGO_WA} className="w-2 h-2 sm:w-3 sm:h-3 shrink-0" />{p.telepon}</span>
-                                             </div>
-                                          </div>
-                                        </td>
-                                        <td className="p-4 sm:p-8 text-center shrink-0">
-                                           <span className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-full text-[7px] sm:text-[10px] font-black tracking-widest uppercase border whitespace-nowrap ${p.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : p.status === 'Lulus' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-red-50 text-red-600 border-red-200'}`}>{p.status}</span>
-                                        </td>
-                                        <td className="p-4 sm:p-8 text-center shrink-0">
-                                          <div className="flex items-center justify-center gap-1.5 sm:gap-3 shrink-0">
-                                            <button onClick={() => handleOpenDetail(p)} title="Profil Detail" className="p-2 sm:p-3.5 bg-white border border-slate-200 text-slate-600 rounded-lg sm:rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm hover:shadow-md shrink-0"><User size={14} className="sm:w-5 sm:h-5 shrink-0" /></button>
-                                            <button onClick={() => handleOpenEditProfile(p)} title="Edit Profil Lengkap" className="p-2 sm:p-3.5 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-lg sm:rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm hover:shadow-md shrink-0"><Edit size={14} className="sm:w-5 sm:h-5 shrink-0" /></button>
-                                            <button onClick={() => handleOpenNilai(p)} title="Input Nilai" className="p-2 sm:p-3.5 bg-blue-50 border border-blue-100 text-blue-600 rounded-lg sm:rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm hover:shadow-md shrink-0"><Award size={14} className="sm:w-5 sm:h-5 shrink-0" /></button>
-                                            {/* Cetak PDF Hanya Muncul Jika Lulus */}
-                                            {p.status === 'Lulus' && (
-                                                <button onClick={() => handleDirectPrint(p)} title="Cetak Transkrip" className="p-2 sm:p-3.5 bg-amber-50 border border-amber-100 text-amber-600 rounded-lg sm:rounded-xl hover:bg-amber-500 hover:text-white transition-all shadow-sm hover:shadow-md shrink-0"><Printer size={14} className="sm:w-5 sm:h-5 shrink-0" /></button>
-                                            )}
-                                          </div>
-                                        </td>
-                                     </tr>
-                                  ));
-                              })()}
-                            </tbody>
-                          </table>
+                               if (filteredDb.length === 0) {
+                                   return (
+                                       <div className="p-12 sm:p-24 text-center flex flex-col items-center justify-center flex-1">
+                                           <Database size={40} className="sm:w-12 sm:h-12 text-slate-200 mb-3 sm:mb-4 shrink-0"/>
+                                           <span className="font-black text-slate-400 uppercase tracking-widest text-[10px] sm:text-sm">Data Siswa Tidak Ditemukan</span>
+                                       </div>
+                                   );
+                               }
+
+                               return filteredDb.map((p, i) => (
+                                   <div key={p.id} className="flex flex-col md:grid md:grid-cols-12 gap-4 items-start md:items-center p-4 sm:p-6 hover:bg-blue-50/50 transition-colors group w-full min-w-0">
+                                       
+                                       {/* Kiri: Avatar + Nama (Klik untuk detail) */}
+                                       <div className="w-full md:col-span-7 flex items-center gap-3 sm:gap-4 min-w-0 cursor-pointer" onClick={() => handleOpenDetail(p)}>
+                                           <div className="hidden md:flex w-8 justify-center font-bold text-slate-400 text-sm shrink-0">{i + 1}</div>
+                                           <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl border border-slate-200 shadow-sm bg-white flex items-center justify-center overflow-hidden shrink-0 group-hover:border-blue-300 transition-colors">
+                                              {p.photo ? <img src={p.photo} className="w-full h-full object-cover shrink-0" /> : <img src={IKON_GENDER[p.gender]} className="w-6 h-6 opacity-30 shrink-0" />}
+                                           </div>
+                                           <div className="flex flex-col min-w-0 flex-1 justify-center">
+                                              <span className="text-sm sm:text-base font-black uppercase text-slate-800 group-hover:text-blue-700 transition-colors truncate w-full leading-tight">{p.nama}</span>
+                                              <span className="flex items-center gap-1.5 sm:gap-2 bg-slate-100 px-2 py-0.5 mt-1.5 rounded-md border border-slate-200 w-max shrink-0 text-[9px] sm:text-[10px] font-bold text-slate-500">
+                                                  <Phone size={10} className="shrink-0"/> {p.telepon}
+                                              </span>
+                                           </div>
+                                       </div>
+
+                                       {/* Kanan: Status & Aksi (Menumpuk di HP, sebaris di PC) */}
+                                       <div className="w-full md:col-span-5 flex items-center justify-between md:justify-end gap-4 pt-3 md:pt-0 border-t border-slate-100 md:border-none min-w-0">
+                                           {/* Status */}
+                                           <div className="shrink-0">
+                                              <span className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-full text-[8px] sm:text-[10px] font-black tracking-widest uppercase border whitespace-nowrap ${p.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : p.status === 'Lulus' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                                                  {p.status}
+                                              </span>
+                                           </div>
+                                           
+                                           {/* Action Buttons */}
+                                           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-wrap justify-end">
+                                              <button onClick={(e) => { e.stopPropagation(); handleOpenDetail(p); }} title="Profil Detail" className="p-2 sm:p-2.5 bg-white border border-slate-200 text-slate-600 rounded-lg sm:rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm hover:shadow-md cursor-pointer shrink-0"><User size={14} className="sm:w-4 sm:h-4 shrink-0" /></button>
+                                              <button onClick={(e) => { e.stopPropagation(); handleOpenEditProfile(p); }} title="Edit Profil" className="p-2 sm:p-2.5 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-lg sm:rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm hover:shadow-md cursor-pointer shrink-0"><Edit size={14} className="sm:w-4 sm:h-4 shrink-0" /></button>
+                                              <button onClick={(e) => { e.stopPropagation(); handleOpenNilai(p); }} title="Input Nilai" className="p-2 sm:p-2.5 bg-blue-50 border border-blue-100 text-blue-600 rounded-lg sm:rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm hover:shadow-md cursor-pointer shrink-0"><Award size={14} className="sm:w-4 sm:h-4 shrink-0" /></button>
+                                              <button onClick={(e) => { e.stopPropagation(); confirmDeleteParticipant(p); }} title="Hapus Data" className="p-2 sm:p-2.5 bg-red-50 border border-red-100 text-red-600 rounded-lg sm:rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm hover:shadow-md cursor-pointer shrink-0"><Trash2 size={14} className="sm:w-4 sm:h-4 shrink-0" /></button>
+                                              {p.status === 'Lulus' && (
+                                                  <button onClick={(e) => { e.stopPropagation(); handleDirectPrint(p); }} title="Cetak Transkrip" className="p-2 sm:p-2.5 bg-amber-50 border border-amber-100 text-amber-600 rounded-lg sm:rounded-xl hover:bg-amber-500 hover:text-white transition-all shadow-sm hover:shadow-md cursor-pointer shrink-0"><Printer size={14} className="sm:w-4 sm:h-4 shrink-0" /></button>
+                                              )}
+                                           </div>
+                                       </div>
+
+                                   </div>
+                               ))
+                           })()}
                         </div>
                       </div>
                    </div>
@@ -1140,26 +1160,22 @@ export default function App() {
                 
                 {/* TOMBOL UNDUH & IMPORT CSV GLOBAL UNTUK DATABASE */}
                 <div className="fixed bottom-6 right-6 sm:bottom-12 sm:right-12 flex flex-col items-center gap-3 sm:gap-5 z-[80] group leading-none text-left">
-                    
-                    {/* Tombol Import CSV */}
                     <div className="flex flex-col items-center opacity-0 group-hover:opacity-100 transition-all translate-y-4 group-hover:translate-y-0 leading-none">
-                      <label className={`w-10 h-10 sm:w-16 sm:h-16 bg-emerald-600 text-white rounded-full shadow-lg sm:shadow-xl flex items-center justify-center border-2 sm:border-4 border-white shadow-slate-200 relative hover:scale-105 transition-transform shrink-0 ${isImporting ? 'cursor-wait opacity-50' : 'cursor-pointer'} group/btn2`}>
+                      <label className={`w-10 h-10 sm:w-16 sm:h-16 bg-emerald-600 text-white rounded-full shadow-lg sm:shadow-xl flex items-center justify-center border-2 sm:border-4 border-white shadow-slate-200 hover:scale-105 transition-transform shrink-0 ${isImporting ? 'cursor-wait opacity-50' : 'cursor-pointer'} group/btn2`}>
                          <Upload size={16} className="sm:w-7 sm:h-7 shrink-0" />
                          <div className="absolute right-14 sm:right-24 px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-900 text-white text-[8px] sm:text-[11px] font-black uppercase tracking-widest rounded-xl opacity-0 group-hover/btn2:opacity-100 transition-opacity whitespace-nowrap shadow-xl shrink-0 pointer-events-none">Import Data CSV</div>
                          <input type="file" accept=".csv" onChange={handleImportCSV} disabled={isImporting} className="hidden" />
                       </label>
                     </div>
 
-                    {/* Tombol Download CSV */}
                     <div className="flex flex-col items-center opacity-0 group-hover:opacity-100 transition-all translate-y-4 group-hover:translate-y-0 leading-none delay-75">
-                      <button onClick={handleDownloadExcel} className="w-10 h-10 sm:w-16 sm:h-16 bg-slate-900 text-white rounded-full shadow-lg sm:shadow-xl flex items-center justify-center border-2 sm:border-4 border-white shadow-slate-200 group/btn relative hover:scale-105 transition-transform shrink-0">
+                      <button onClick={handleDownloadExcel} className="w-10 h-10 sm:w-16 sm:h-16 bg-slate-900 text-white rounded-full shadow-lg sm:shadow-xl flex items-center justify-center border-2 sm:border-4 border-white shadow-slate-200 group/btn hover:scale-105 transition-transform shrink-0 cursor-pointer">
                          <Download size={16} className="sm:w-7 sm:h-7 shrink-0" />
                          <div className="absolute right-14 sm:right-24 px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-900 text-white text-[8px] sm:text-[11px] font-black uppercase tracking-widest rounded-xl opacity-0 group-hover/btn:opacity-100 transition-opacity whitespace-nowrap shadow-xl shrink-0 pointer-events-none">Unduh Laporan CSV</div>
                       </button>
                     </div>
                     
-                    {/* Tombol Induk Database */}
-                    <button className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center border-2 sm:border-4 border-white leading-none relative group/main text-white hover:bg-blue-700 transition-colors shrink-0">
+                    <button className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center border-2 sm:border-4 border-white leading-none group/main text-white hover:bg-blue-700 transition-colors shrink-0 cursor-pointer">
                       <Database size={20} className="sm:w-7 sm:h-7 shrink-0" />
                     </button>
                 </div>
@@ -1242,67 +1258,65 @@ export default function App() {
                            )}
                        </div>
 
-                       <button onClick={handleAddDailyAttendee} disabled={!selectedStudentForAbsen} className="w-full py-3.5 sm:py-4 bg-teal-500 text-white font-black rounded-lg sm:rounded-xl hover:bg-teal-600 active:scale-[0.98] transition-all uppercase tracking-widest text-[9px] sm:text-[10px] disabled:opacity-50 disabled:cursor-not-allowed mt-auto flex items-center justify-center gap-2 shrink-0">
-                           <Plus size={16} className="shrink-0" /> Tambah Ke Daftar Hadir
-                       </button>
+                       <div className="w-full pt-2">
+                         <button onClick={handleAddDailyAttendee} disabled={!selectedStudentForAbsen} className="w-full py-3.5 sm:py-4 bg-teal-500 text-white font-black rounded-lg sm:rounded-xl hover:bg-teal-600 active:scale-[0.98] transition-all uppercase tracking-widest text-[9px] sm:text-[10px] disabled:opacity-50 disabled:cursor-not-allowed mt-auto flex items-center justify-center gap-2 shrink-0 cursor-pointer block">
+                             <Plus size={16} className="shrink-0" /> Tambah Ke Daftar Hadir
+                         </button>
+                       </div>
                     </div>
                  </div>
 
                  {/* DAFTAR HADIR SEMENTARA */}
-                 <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden w-full min-w-0">
+                 <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden w-full min-w-0 flex flex-col">
                     <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
                         <div className="min-w-0">
                             <h3 className="font-black text-slate-800 uppercase text-xs sm:text-sm truncate">Daftar Kehadiran Sesi Ini</h3>
                             <p className="text-[8px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 truncate">Total: {dailyAttendees.length} Siswa Ditambahkan</p>
                         </div>
                     </div>
-                    <div className="overflow-x-auto min-h-[150px] w-full">
-                        <table className="w-full text-left font-sans min-w-[600px]">
-                            <thead className="bg-white border-b border-slate-100 font-black text-[9px] sm:text-[10px] uppercase text-slate-400 tracking-widest">
-                                <tr>
-                                    <th className="p-3 sm:p-4 w-12 sm:w-16 text-center shrink-0">No</th>
-                                    <th className="p-3 sm:p-4">Nama Peserta</th>
-                                    <th className="p-3 sm:p-4">Program</th>
-                                    <th className="p-3 sm:p-4 text-center w-36 sm:w-40 shrink-0">Pertemuan Ke (Edit)</th>
-                                    <th className="p-3 sm:p-4 text-center w-20 sm:w-24 shrink-0">Batal</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {dailyAttendees.length === 0 ? (
-                                    <tr><td colSpan="5" className="p-12 sm:p-16 text-center font-black text-slate-300 text-[10px] sm:text-xs italic">Belum ada peserta yang dimasukkan ke daftar hadir</td></tr>
-                                ) : (
-                                    dailyAttendees.map((p, i) => (
-                                        <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-3 sm:p-4 text-center font-bold text-slate-400 text-xs sm:text-sm">{i + 1}</td>
-                                            <td className="p-3 sm:p-4 font-black uppercase text-slate-800 text-[10px] sm:text-sm">{p.nama}</td>
-                                            <td className="p-3 sm:p-4 font-bold text-slate-500 text-[9px] sm:text-xs">{p.program.split(' (')[0]}</td>
-                                            <td className="p-3 sm:p-4 text-center">
-                                               <div className="flex items-center justify-center gap-2">
-                                                   <span className="text-[10px] font-bold text-slate-400">Ke-</span>
-                                                   <input 
-                                                      type="number" 
-                                                      min="1"
-                                                      value={p.inputPertemuan}
-                                                      onChange={(e) => handleUpdateMeetingNumber(p.id, e.target.value)}
-                                                      className="appearance-none w-14 sm:w-16 text-center font-black text-teal-700 bg-teal-50 px-2 py-1.5 rounded-lg text-xs sm:text-sm border border-teal-200 outline-none focus:ring-2 focus:ring-teal-500 transition-all shadow-inner"
-                                                      title="Kamu bisa mengubah angka ini untuk mem-balance jumlah absensi lama"
-                                                   />
-                                               </div>
-                                            </td>
-                                            <td className="p-3 sm:p-4 text-center">
-                                                <button onClick={() => handleRemoveDailyAttendee(p.id)} className="p-2 sm:p-2.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors">
-                                                    <Trash2 size={14} className="sm:w-[16px] sm:h-[16px]" />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                    
+                    {/* LAYOUT LIST RESPONSIVE PENGGANTI TABEL KUNO */}
+                    <div className="flex flex-col divide-y divide-slate-100 flex-grow min-h-[150px]">
+                        {dailyAttendees.length === 0 ? (
+                            <div className="p-12 sm:p-16 text-center font-black text-slate-300 text-[10px] sm:text-xs italic flex flex-col items-center justify-center flex-1">
+                                Belum ada peserta yang dimasukkan ke daftar hadir
+                            </div>
+                        ) : (
+                            dailyAttendees.map((p, i) => (
+                                <div key={p.id} className="flex flex-col sm:grid sm:grid-cols-12 gap-3 sm:gap-4 items-start sm:items-center p-4 sm:p-5 hover:bg-slate-50 transition-colors w-full min-w-0">
+                                    {/* Kolom Kiri: Profil */}
+                                    <div className="sm:col-span-7 flex items-center gap-3 sm:gap-4 min-w-0 w-full flex-1">
+                                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-xs shrink-0">{i + 1}</div>
+                                        <div className="flex flex-col min-w-0 flex-1">
+                                            <span className="font-black uppercase text-slate-800 text-xs sm:text-sm truncate w-full">{p.nama}</span>
+                                            <span className="font-bold text-slate-500 text-[9px] sm:text-[10px] truncate w-full mt-0.5">{p.program.split(' (')[0]}</span>
+                                        </div>
+                                    </div>
+                                    {/* Kolom Kanan: Aksi (Menyatu/menumpuk rapi di HP) */}
+                                    <div className="sm:col-span-5 flex items-center justify-between sm:justify-end gap-4 w-full pt-3 sm:pt-0 border-t border-slate-100 sm:border-none min-w-0">
+                                        <div className="flex items-center justify-center gap-2 shrink-0">
+                                            <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ke-</span>
+                                            <input 
+                                                type="number" 
+                                                min="1"
+                                                value={p.inputPertemuan}
+                                                onChange={(e) => handleUpdateMeetingNumber(p.id, e.target.value)}
+                                                className="appearance-none w-14 sm:w-16 text-center font-black text-teal-700 bg-teal-50 px-2 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm border border-teal-200 outline-none focus:ring-2 focus:ring-teal-500 transition-all shadow-inner shrink-0"
+                                                title="Kamu bisa mengubah angka ini untuk mem-balance jumlah absensi lama"
+                                            />
+                                        </div>
+                                        <button onClick={() => handleRemoveDailyAttendee(p.id)} className="p-2 sm:p-2.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors cursor-pointer shrink-0">
+                                            <Trash2 size={14} className="sm:w-[16px] sm:h-[16px]" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
+
                     {/* ACTION BUTTON */}
                     <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 flex justify-end shrink-0 w-full">
-                        <button onClick={handleSaveDailyAttendance} disabled={dailyAttendees.length === 0} className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-slate-900 text-white font-black rounded-xl hover:bg-teal-600 active:scale-[0.98] transition-all uppercase tracking-widest text-[10px] sm:text-xs disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2 sm:gap-3 shrink-0">
+                        <button onClick={handleSaveDailyAttendance} disabled={dailyAttendees.length === 0} className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-slate-900 text-white font-black rounded-xl hover:bg-teal-600 active:scale-[0.98] transition-all uppercase tracking-widest text-[10px] sm:text-xs disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2 sm:gap-3 shrink-0 cursor-pointer block">
                             <Save size={16} className="sm:w-[18px] sm:h-[18px] shrink-0" /> Simpan & Rekam Semua Absensi
                         </button>
                     </div>
@@ -1343,7 +1357,7 @@ export default function App() {
                      <div className="p-4 sm:p-8 border-b border-slate-200 bg-slate-50 flex flex-col gap-4 sm:gap-6 text-black leading-none text-left shrink-0 min-w-0">
                       <div className="flex flex-col md:flex-row md:items-center gap-3 sm:gap-8 text-left text-black leading-none justify-between min-w-0 w-full">
                           <div className="flex items-center gap-3 sm:gap-6 min-w-0 w-full flex-1">
-                            <button onClick={() => setSelectedAbsensiCourse(null)} className="p-2 sm:p-3 bg-white rounded-xl sm:rounded-2xl border border-slate-200 text-slate-400 transition-all shadow-sm flex items-center justify-center leading-none shrink-0 hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200"><ChevronLeft size={18} className="sm:w-6 sm:h-6 shrink-0" /></button>
+                            <button onClick={() => setSelectedAbsensiCourse(null)} className="p-2 sm:p-3 bg-white rounded-xl sm:rounded-2xl border border-slate-200 text-slate-400 transition-all shadow-sm flex items-center justify-center leading-none shrink-0 hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200 cursor-pointer"><ChevronLeft size={18} className="sm:w-6 sm:h-6 shrink-0" /></button>
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-4 mb-1 sm:mb-2 min-w-0">
                                     <h2 className="text-sm sm:text-2xl font-black text-slate-800 uppercase leading-tight truncate w-full sm:w-auto">{selectedAbsensiCourse.split(' (')[0]}</h2>
@@ -1409,7 +1423,7 @@ export default function App() {
                                                   <button 
                                                       key={pertemuanKe}
                                                       onClick={() => handleToggleAbsenPrivate(p.id, pertemuanKe, !!isHadir)}
-                                                      className={`relative group flex flex-col items-center justify-center py-2.5 sm:py-4 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 overflow-hidden shrink-0 ${isHadir ? 'bg-purple-50 border-purple-500 text-purple-700 shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:border-purple-300 hover:bg-slate-50'}`}
+                                                      className={`relative group flex flex-col items-center justify-center py-2.5 sm:py-4 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 overflow-hidden shrink-0 cursor-pointer block ${isHadir ? 'bg-purple-50 border-purple-500 text-purple-700 shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:border-purple-300 hover:bg-slate-50'}`}
                                                   >
                                                       <span className="text-[8px] sm:text-[12px] font-black uppercase tracking-wider opacity-80 mb-1 sm:mb-1.5">P{pertemuanKe}</span>
                                                       {isHadir ? (
@@ -1444,7 +1458,7 @@ export default function App() {
                          <p className="text-slate-400 text-[8px] sm:text-sm font-bold uppercase tracking-widest leading-none text-left truncate w-full">Pusat Backup Dokumen PDF Digital</p>
                        </div>
                     </div>
-                    <button onClick={() => setIsUploadModalOpen(true)} className="p-3.5 sm:p-5 bg-amber-500 text-white rounded-xl sm:rounded-2xl shadow-lg hover:bg-amber-600 hover:shadow-xl hover:-translate-y-1 transition-all flex items-center gap-2 sm:gap-3 leading-none w-full md:w-auto justify-center group shrink-0 mt-2 md:mt-0"><CloudUpload size={16} className="sm:w-5 sm:h-5 shrink-0 group-hover:animate-bounce" /><span className="font-black text-[9px] sm:text-[11px] uppercase tracking-widest leading-none shrink-0">Upload Backup PDF</span></button>
+                    <button onClick={() => setIsUploadModalOpen(true)} className="p-3.5 sm:p-5 bg-amber-500 text-white rounded-xl sm:rounded-2xl shadow-lg hover:bg-amber-600 hover:shadow-xl hover:-translate-y-1 transition-all flex items-center gap-2 sm:gap-3 leading-none w-full md:w-auto justify-center group shrink-0 mt-2 md:mt-0 cursor-pointer"><CloudUpload size={16} className="sm:w-5 sm:h-5 shrink-0 group-hover:animate-bounce" /><span className="font-black text-[9px] sm:text-[11px] uppercase tracking-widest leading-none shrink-0">Upload Backup PDF</span></button>
                   </div>
                   
                   <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-8 leading-none w-full min-w-0">
@@ -1463,9 +1477,9 @@ export default function App() {
                              <span className="text-[6px] sm:text-[8px] font-black text-slate-400 uppercase leading-none mb-1 sm:mb-1.5 text-center tracking-widest shrink-0">NOMOR SERTIFIKAT</span>
                              <span className="text-[8px] sm:text-[11px] font-black text-slate-700 leading-none text-center break-all w-full">{cert.noSertifikat}</span>
                           </div>
-                          <div className="flex flex-col sm:grid sm:grid-cols-2 gap-2 sm:gap-3 w-full leading-none text-left relative z-10 mt-auto min-w-0">
-                             <a href={cert.fileUrl} download={cert.fileName} className="py-2.5 sm:py-3.5 bg-slate-900 text-white rounded-lg sm:rounded-xl font-black text-[8px] sm:text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-colors flex items-center justify-center gap-1.5 sm:gap-2 leading-none text-left shadow-sm hover:shadow-md shrink-0"><Download size={12} className="sm:w-3.5 sm:h-3.5 shrink-0" /> <span className="hidden sm:inline">Download</span><span className="sm:hidden">Unduh</span></a>
-                             <button onClick={() => window.print()} className="py-2.5 sm:py-3.5 bg-amber-500 text-white rounded-lg sm:rounded-xl font-black text-[8px] sm:text-[10px] uppercase tracking-widest hover:bg-amber-600 transition-colors flex items-center justify-center gap-1.5 sm:gap-2 leading-none text-left shadow-sm hover:shadow-md shrink-0"><Printer size={12} className="sm:w-3.5 sm:h-3.5 shrink-0" /> Print</button>
+                          <div className="flex flex-col sm:grid sm:grid-cols-2 gap-2 sm:gap-3 w-full leading-none text-left mt-auto min-w-0">
+                             <a href={cert.fileUrl} download={cert.fileName} className="py-2.5 sm:py-3.5 bg-slate-900 text-white rounded-lg sm:rounded-xl font-black text-[8px] sm:text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-colors flex items-center justify-center gap-1.5 sm:gap-2 leading-none text-left shadow-sm hover:shadow-md shrink-0 cursor-pointer block"><Download size={12} className="sm:w-3.5 sm:h-3.5 shrink-0" /> <span className="hidden sm:inline">Download</span><span className="sm:hidden">Unduh</span></a>
+                             <button onClick={() => window.print()} className="py-2.5 sm:py-3.5 bg-amber-500 text-white rounded-lg sm:rounded-xl font-black text-[8px] sm:text-[10px] uppercase tracking-widest hover:bg-amber-600 transition-colors flex items-center justify-center gap-1.5 sm:gap-2 leading-none text-left shadow-sm hover:shadow-md shrink-0 cursor-pointer block"><Printer size={12} className="sm:w-3.5 sm:h-3.5 shrink-0" /> Print</button>
                           </div>
                         </div>
                       ))
@@ -1499,7 +1513,7 @@ export default function App() {
                    </div>
                    <div className="space-y-2 sm:space-y-3 leading-none text-left text-black w-full">
                       <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Program</label>
-                      <select name="program" required className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl outline-none focus:border-amber-400 font-bold bg-white text-black text-xs sm:text-sm transition-colors min-h-[44px]">
+                      <select name="program" required className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl outline-none focus:border-amber-400 font-bold bg-white text-black text-xs sm:text-sm transition-colors min-h-[44px] cursor-pointer">
                          {PROGRAM_CHOICES.map(p => <option key={p} value={p}>{p}</option>)}
                       </select>
                    </div>
@@ -1507,8 +1521,28 @@ export default function App() {
                       <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">File Dokumen (.PDF / Gambar)</label>
                       <input name="file" required type="file" accept=".pdf,image/*" className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl outline-none font-bold text-black file:mr-3 sm:file:mr-4 file:py-1.5 sm:file:py-2 file:px-4 sm:file:px-5 file:rounded-lg sm:file:rounded-full file:border-0 file:text-[8px] sm:file:text-[10px] file:font-black file:uppercase file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 text-[10px] sm:text-xs transition-colors cursor-pointer" />
                    </div>
-                   <button type="submit" className="w-full py-4 sm:py-5 bg-slate-900 text-white font-black rounded-xl sm:rounded-2xl shadow-xl uppercase tracking-widest text-[9px] sm:text-[10px] hover:bg-amber-500 hover:-translate-y-1 transition-all leading-none mt-2 sm:mt-6 text-white text-center shrink-0 block">Simpan ke Arsip Cloud</button>
+                   <div className="w-full pt-4">
+                     <button type="submit" className="w-full py-4 sm:py-5 bg-slate-900 text-white font-black rounded-xl sm:rounded-2xl shadow-xl uppercase tracking-widest text-[9px] sm:text-[10px] hover:bg-amber-500 hover:-translate-y-1 transition-all leading-none mt-2 text-white text-center shrink-0 cursor-pointer block">Simpan ke Arsip Cloud</button>
+                   </div>
                 </form>
+             </div>
+          </div>
+        )}
+
+        {/* Modal Hapus Data Custom */}
+        {participantToDelete && (
+          <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
+             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setParticipantToDelete(null)} />
+             <div className="relative bg-white rounded-3xl shadow-2xl p-6 sm:p-8 max-w-sm w-full animate-in zoom-in-95 flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
+                   <Trash2 size={32} />
+                </div>
+                <h3 className="text-xl font-black text-slate-800 mb-2">Hapus Data?</h3>
+                <p className="text-sm text-slate-500 mb-6 leading-relaxed">Apakah Anda yakin ingin menghapus data <strong>{participantToDelete.nama}</strong>? Tindakan ini akan menghapus data secara permanen.</p>
+                <div className="flex gap-3 w-full">
+                   <button onClick={() => setParticipantToDelete(null)} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors cursor-pointer">Batal</button>
+                   <button onClick={handleDeleteParticipant} className="flex-1 py-3.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-red-500/30 cursor-pointer">Ya, Hapus</button>
+                </div>
              </div>
           </div>
         )}
@@ -1537,9 +1571,9 @@ export default function App() {
                       ))}
                    </div>
                 </div>
-                <div className="p-4 sm:p-8 bg-white border-t border-slate-100 flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4 shrink-0 leading-none text-black z-10 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] w-full">
-                    <button type="button" onClick={() => setIsNilaiModalOpen(false)} className="px-6 sm:px-8 py-3.5 sm:py-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-[11px] text-slate-600 text-center w-full sm:w-auto uppercase tracking-widest transition-colors shrink-0">Batal</button>
-                    <button type="submit" className="px-8 sm:px-10 py-3.5 sm:py-4 bg-blue-600 text-white font-black rounded-xl sm:rounded-2xl hover:bg-blue-700 shadow-lg hover:shadow-blue-500/30 transition-all uppercase tracking-widest text-[10px] sm:text-[11px] text-white text-center w-full sm:w-auto flex items-center justify-center gap-2 shrink-0"><Save size={16} className="shrink-0" /> Luluskan Siswa</button>
+                <div className="p-4 sm:p-8 bg-white border-t border-slate-100 flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4 shrink-0 leading-none text-black shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] w-full">
+                    <button type="button" onClick={() => setIsNilaiModalOpen(false)} className="px-6 sm:px-8 py-3.5 sm:py-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-[11px] text-slate-600 text-center w-full sm:w-auto uppercase tracking-widest transition-colors shrink-0 cursor-pointer block">Batal</button>
+                    <button type="submit" className="px-8 sm:px-10 py-3.5 sm:py-4 bg-blue-600 text-white font-black rounded-xl sm:rounded-2xl hover:bg-blue-700 shadow-lg hover:shadow-blue-500/30 transition-all uppercase tracking-widest text-[10px] sm:text-[11px] text-white text-center w-full sm:w-auto flex items-center justify-center gap-2 shrink-0 cursor-pointer block"><Save size={16} className="shrink-0" /> Luluskan Siswa</button>
                 </div>
               </form>
             </div>
@@ -1557,10 +1591,10 @@ export default function App() {
                  
                  {/* Upload Foto Langsung */}
                  <div className="relative mb-4 sm:mb-8 group shrink-0">
-                    <div className="w-24 h-24 sm:w-40 sm:h-40 bg-white rounded-full flex items-center justify-center border-4 sm:border-[6px] border-white shadow-xl shrink-0 leading-none text-slate-200 text-left overflow-hidden relative z-10 group-hover:border-blue-50 transition-colors">
+                    <div className="w-24 h-24 sm:w-40 sm:h-40 bg-white rounded-full flex items-center justify-center border-4 sm:border-[6px] border-white shadow-xl shrink-0 leading-none text-slate-200 text-left overflow-hidden group-hover:border-blue-50 transition-colors">
                        {selectedParticipant.photo ? <img src={selectedParticipant.photo} className="w-full h-full object-cover shrink-0" /> : <User size={48} className="sm:w-[80px] sm:h-[80px] text-slate-300 shrink-0" />}
                     </div>
-                    <label className="absolute -bottom-1 -right-1 sm:-bottom-0 sm:right-2 p-2.5 sm:p-3.5 bg-blue-600 text-white rounded-full shadow-lg cursor-pointer hover:bg-slate-900 hover:scale-110 transition-all flex items-center justify-center border-2 sm:border-4 border-slate-50 z-20 shrink-0">
+                    <label className="absolute -bottom-1 -right-1 sm:-bottom-0 sm:right-2 p-2.5 sm:p-3.5 bg-blue-600 text-white rounded-full shadow-lg cursor-pointer hover:bg-slate-900 hover:scale-110 transition-all flex items-center justify-center border-2 sm:border-4 border-slate-50 shrink-0">
                        <Camera size={14} className="sm:w-5 sm:h-5 shrink-0" />
                        <input type="file" accept="image/*" onChange={handlePhotoUploadInstant} className="hidden" />
                     </label>
@@ -1631,7 +1665,7 @@ export default function App() {
                  {/* Tampilan Nilai Rata-rata */}
                  <div className="bg-slate-900 rounded-[1.5rem] sm:rounded-[3rem] p-6 sm:p-12 lg:p-14 text-white shadow-2xl relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 sm:mb-12 shrink-0 leading-none gap-6 sm:gap-0 border border-slate-800 w-full min-w-0">
                     <div className="absolute right-0 top-0 w-32 sm:w-64 h-full bg-blue-500/20 skew-x-[-20deg] translate-x-16 sm:translate-x-32 leading-none text-white text-left blur-2xl"></div>
-                    <div className="leading-none z-10 min-w-0">
+                    <div className="leading-none min-w-0">
                         <p className="text-[8px] sm:text-[12px] font-black uppercase tracking-[0.2em] sm:tracking-[0.5em] text-blue-400 mb-3 sm:mb-8 flex items-center gap-2 sm:gap-3 font-sans truncate"><Award size={14} className="sm:w-5 sm:h-5 text-blue-400 shrink-0"/> Indeks Skor (GPA)</p>
                         <div className="flex items-baseline leading-none text-white">
                             <span className="text-5xl sm:text-8xl lg:text-9xl font-black tracking-tighter text-white drop-shadow-lg shrink-0">{hitungRataRata(selectedParticipant.nilai)}</span>
@@ -1641,7 +1675,7 @@ export default function App() {
                  </div>
                  
                  <div className="hidden md:flex justify-end mt-auto pt-6 shrink-0">
-                    <button onClick={() => setIsDetailModalOpen(false)} className="text-[9px] sm:text-[11px] font-black uppercase tracking-widest text-slate-500 hover:text-white hover:bg-slate-900 border border-slate-200 transition-colors flex items-center gap-2 sm:gap-3 bg-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl shadow-sm shrink-0"><X size={16} className="shrink-0" /> Tutup Jendela Profil</button>
+                    <button onClick={() => setIsDetailModalOpen(false)} className="text-[9px] sm:text-[11px] font-black uppercase tracking-widest text-slate-500 hover:text-white hover:bg-slate-900 border border-slate-200 transition-colors flex items-center gap-2 sm:gap-3 bg-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl shadow-sm shrink-0 cursor-pointer"><X size={16} className="shrink-0" /> Tutup Jendela Profil</button>
                  </div>
               </div>
             </div>
