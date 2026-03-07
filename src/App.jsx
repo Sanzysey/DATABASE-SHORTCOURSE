@@ -55,7 +55,7 @@ const MATERI_OTOMATIS = {
 const MATERI_DEFAULT_FALLBACK = ["Windows Manajemen", "Materi Kompetensi Utama", "Project Akhir"];
 
 const getPertemuanCount = (programName) => {
-  const match = programName.match(/(\d+)x Pertemuan/);
+  const match = programName?.match(/(\d+)x Pertemuan/);
   return match ? parseInt(match[1]) : 0;
 };
 
@@ -642,7 +642,7 @@ export default function App() {
 
   return (
     <>
-      <div className="print:hidden min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col items-center">
+      <div className="print:hidden min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col items-center relative z-0">
         
         {/* --- NOTIFIKASI TOAST --- */}
         {message && (
@@ -655,7 +655,7 @@ export default function App() {
         )}
 
         {/* --- TOP BAR INFO KONTAK (FULL WIDTH) --- */}
-        <div className="w-full bg-slate-900 text-slate-300 py-2.5 px-4 sm:px-6 lg:px-8 text-xs sm:text-sm border-b border-slate-800">
+        <div className="w-full bg-slate-900 text-slate-300 py-2.5 px-4 sm:px-6 lg:px-8 text-xs sm:text-sm border-b border-slate-800 z-50">
           <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-center gap-3 md:gap-6">
             
             {/* Bagian Alamat (Running Text) */}
@@ -712,8 +712,8 @@ export default function App() {
               </div>
 
               {/* Tombol Hamburger Tampilan HP */}
-              <div className="flex items-center lg:hidden shrink-0 ml-4">
-                <button onClick={() => setIsMenuOpen(true)} className="p-2.5 text-slate-600 hover:bg-slate-100 rounded-xl bg-slate-50 border border-slate-200 active:scale-95 transition-transform cursor-pointer">
+              <div className="flex items-center lg:hidden shrink-0 ml-4 relative z-20">
+                <button onClick={() => setIsMenuOpen(true)} className="p-2.5 text-slate-600 hover:bg-slate-100 rounded-xl bg-slate-50 border border-slate-200 active:scale-95 transition-transform cursor-pointer relative z-20">
                   <Menu size={24} className="shrink-0" />
                 </button>
               </div>
@@ -735,7 +735,7 @@ export default function App() {
                  <button 
                    key={item.id} 
                    onClick={() => handleNavigation(item.id)} 
-                   className={`flex items-center gap-4 p-3.5 rounded-2xl transition-all duration-300 w-full text-left group cursor-pointer ${activeTab === item.id ? 'bg-white shadow-md border border-slate-100 translate-x-1' : 'hover:bg-slate-200/50 border border-transparent hover:translate-x-1'}`}
+                   className={`flex items-center gap-4 p-3.5 rounded-2xl transition-all duration-300 w-full text-left group cursor-pointer relative z-10 ${activeTab === item.id ? 'bg-white shadow-md border border-slate-100 translate-x-1' : 'hover:bg-slate-200/50 border border-transparent hover:translate-x-1'}`}
                  >
                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-sm ${activeTab === item.id ? item.color : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-blue-600'}`}>
                      {item.icon}
@@ -766,11 +766,11 @@ export default function App() {
                  <h2 className="text-base sm:text-lg font-black text-slate-800 uppercase tracking-tighter truncate">NAVIGASI SISTEM</h2>
                  <p className="text-[8px] sm:text-[9px] font-bold text-blue-600 uppercase tracking-widest mt-1 truncate">Enter Training Center</p>
               </div>
-              <button onClick={() => setIsMenuOpen(false)} className="p-2 sm:p-2.5 bg-slate-50 hover:bg-red-600 hover:text-white transition-all rounded-xl flex items-center justify-center text-slate-400 shrink-0 ml-2 cursor-pointer"><X size={20} className="shrink-0" /></button>
+              <button onClick={() => setIsMenuOpen(false)} className="p-2 sm:p-2.5 bg-slate-50 hover:bg-red-600 hover:text-white transition-all rounded-xl flex items-center justify-center text-slate-400 shrink-0 ml-2 relative z-20 cursor-pointer"><X size={20} className="shrink-0" /></button>
             </div>
-            <div className="px-4 sm:px-6 py-6 space-y-3 sm:space-y-4 text-left overflow-y-auto max-h-[calc(100vh-100px)]">
+            <div className="px-4 sm:px-6 py-6 space-y-3 sm:space-y-4 text-left overflow-y-auto max-h-[calc(100vh-100px)] relative z-10">
               {NAV_ITEMS.map(item => (
-                <button key={item.id} onClick={() => handleNavigation(item.id)} className={`w-full flex items-center space-x-4 p-3.5 sm:p-4 rounded-2xl sm:rounded-[2rem] transition-all cursor-pointer ${activeTab === item.id ? 'bg-slate-100 text-blue-600 shadow-inner' : 'hover:bg-slate-50 text-slate-600'}`}>
+                <button key={item.id} onClick={() => handleNavigation(item.id)} className={`w-full flex items-center space-x-4 p-3.5 sm:p-4 rounded-2xl sm:rounded-[2rem] transition-all cursor-pointer relative z-10 ${activeTab === item.id ? 'bg-slate-100 text-blue-600 shadow-inner' : 'hover:bg-slate-50 text-slate-600'}`}>
                   <div className={`${item.color} p-2.5 sm:p-3 rounded-xl text-white shadow-md shrink-0`}>{item.icon}</div>
                   <span className="font-black uppercase text-[10px] sm:text-xs tracking-widest leading-none text-left min-w-0 truncate">{item.label}</span>
                 </button>
@@ -779,7 +779,7 @@ export default function App() {
           </div>
 
           {/* MAIN CONTENT AREA */}
-          <main className="flex-1 w-full min-w-0 py-6 sm:py-10 px-4 sm:px-8 lg:px-12 leading-none overflow-x-hidden pb-24 lg:pb-12">
+          <main className="flex-1 w-full min-w-0 py-6 sm:py-10 px-4 sm:px-8 lg:px-12 leading-none overflow-x-hidden pb-24 lg:pb-12 relative z-10">
             
             {/* TAB HOME */}
             {activeTab === 'home' && (
@@ -818,7 +818,7 @@ export default function App() {
                 {/* Menu Akses Cepat */}
                 <div>
                   <h3 className="text-[10px] sm:text-sm font-black text-slate-800 uppercase tracking-widest mb-3 sm:mb-6 ml-2">Menu Akses Cepat</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-6 text-left">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-6 text-left relative z-10">
                     {[
                       { label: 'Registrasi', icon: <UserPlus size={20} className="sm:w-6 sm:h-6 shrink-0" />, color: 'bg-orange-50 text-orange-600', tab: 'form', desc: 'Input Baru', border: 'border-orange-100 hover:border-orange-400', shadow: 'hover:shadow-orange-500/20' },
                       { label: 'Database', icon: <Database size={20} className="sm:w-6 sm:h-6 shrink-0" />, color: 'bg-indigo-50 text-indigo-600', tab: 'database', desc: 'Kelola Data', border: 'border-indigo-100 hover:border-indigo-400', shadow: 'hover:shadow-indigo-500/20' },
@@ -842,9 +842,9 @@ export default function App() {
                    <div className="lg:col-span-2 bg-white p-5 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-slate-200 shadow-sm flex flex-col min-w-0">
                       <div className="flex justify-between items-center mb-4 sm:mb-6 gap-2">
                          <h3 className="text-[10px] sm:text-sm font-black text-slate-800 uppercase tracking-widest truncate">Pendaftaran Terbaru</h3>
-                         <button onClick={() => handleNavigation('database')} className="text-[8px] sm:text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-800 flex items-center gap-1 transition-colors shrink-0 cursor-pointer">Lihat Semua <ChevronRight size={14} className="shrink-0" /></button>
+                         <button onClick={() => handleNavigation('database')} className="text-[8px] sm:text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-800 flex items-center gap-1 transition-colors shrink-0 cursor-pointer relative z-10">Lihat Semua <ChevronRight size={14} className="shrink-0" /></button>
                       </div>
-                      <div className="flex flex-col gap-2 sm:gap-3 flex-grow">
+                      <div className="flex flex-col gap-2 sm:gap-3 flex-grow relative z-10">
                          {participants.slice(0, 4).map((p, i) => (
                             <div key={i} className="flex items-center justify-between p-3 sm:p-4 rounded-2xl border border-slate-50 hover:bg-slate-50 hover:border-slate-200 transition-all cursor-pointer group min-w-0 gap-3" onClick={() => handleOpenDetail(p)}>
                                <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
@@ -868,7 +868,7 @@ export default function App() {
                    </div>
 
                    {/* Card Action / Quick Stat */}
-                   <div className="flex flex-col gap-6 sm:gap-8">
+                   <div className="flex flex-col gap-6 sm:gap-8 relative z-10">
                        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[2rem] sm:rounded-[3rem] p-6 sm:p-8 text-white shadow-xl relative overflow-hidden flex flex-col justify-between flex-1">
                           <div className="absolute -right-8 -top-8 text-white/10 rotate-12 pointer-events-none">
                              <Database size={180} className="shrink-0" />
@@ -882,8 +882,8 @@ export default function App() {
                                 Buka form pendaftaran untuk memasukkan data siswa shortcourse baru ke dalam sistem secara realtime.
                              </p>
                           </div>
-                          <div className="relative z-10">
-                             <button onClick={() => handleNavigation('form')} className="w-full py-3 sm:py-4 bg-white text-blue-700 rounded-xl sm:rounded-2xl font-black text-[9px] sm:text-xs uppercase tracking-widest hover:bg-blue-50 transition-all shadow-md active:scale-95 text-center shrink-0 cursor-pointer block">
+                          <div className="relative z-20">
+                             <button onClick={() => handleNavigation('form')} className="w-full py-3 sm:py-4 bg-white text-blue-700 rounded-xl sm:rounded-2xl font-black text-[9px] sm:text-xs uppercase tracking-widest hover:bg-blue-50 transition-all shadow-md active:scale-95 text-center shrink-0 cursor-pointer relative z-20 block">
                                 + Input Data Siswa
                              </button>
                           </div>
@@ -896,30 +896,30 @@ export default function App() {
             {/* TAB FORM REGISTRASI */}
             {activeTab === 'form' && (
               <div className="max-w-4xl mx-auto animate-in zoom-in-95 duration-500 text-left w-full min-w-0">
-                <div className="bg-white rounded-[2rem] sm:rounded-[4rem] shadow-xl border border-slate-200 overflow-hidden text-left leading-none flex flex-col w-full">
+                <div className="bg-white rounded-[2rem] sm:rounded-[4rem] shadow-xl border border-slate-200 overflow-hidden text-left leading-none flex flex-col w-full relative z-10">
                   <div className="bg-slate-900 p-6 sm:p-12 text-white flex justify-between items-center leading-none text-white shrink-0">
                     <div className="min-w-0"><h2 className="text-xl sm:text-3xl font-black uppercase tracking-tighter leading-none text-white truncate">Registrasi</h2><p className="text-slate-400 text-[8px] sm:text-[11px] font-bold uppercase mt-1.5 sm:mt-3 tracking-widest leading-none truncate">Pendaftaran Siswa Baru</p></div>
                     <UserPlus className="w-8 h-8 sm:w-14 sm:h-14 text-blue-500 shrink-0 ml-4" />
                   </div>
-                  <form onSubmit={(e) => { e.preventDefault(); handleAddParticipant(Object.fromEntries(new FormData(e.target))); e.target.reset(); }} className="p-5 sm:p-12 space-y-5 sm:space-y-8 leading-none text-left w-full">
+                  <form onSubmit={(e) => { e.preventDefault(); handleAddParticipant(Object.fromEntries(new FormData(e.target))); e.target.reset(); }} className="p-5 sm:p-12 space-y-5 sm:space-y-8 leading-none text-left w-full relative z-20">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8 text-left leading-none w-full">
-                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">NIK</label><input name="nik" required type="number" className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl outline-none focus:ring-4 focus:ring-blue-100 font-bold leading-none text-black text-xs sm:text-base transition-shadow" /></div>
-                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Nama Lengkap</label><input name="nama" required type="text" className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl outline-none focus:ring-4 focus:ring-blue-100 font-bold uppercase leading-none text-black text-xs sm:text-base transition-shadow" /></div>
+                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">NIK</label><input name="nik" required type="number" className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl outline-none focus:ring-4 focus:ring-blue-100 font-bold leading-none text-black text-xs sm:text-base transition-shadow relative z-20" /></div>
+                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Nama Lengkap</label><input name="nama" required type="text" className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl outline-none focus:ring-4 focus:ring-blue-100 font-bold uppercase leading-none text-black text-xs sm:text-base transition-shadow relative z-20" /></div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8 text-left leading-none w-full">
                       <div className="space-y-2 sm:space-y-3 w-full">
                          <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Tempat Lahir</label>
-                         <input name="tempatLahir" required type="text" className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl outline-none focus:ring-4 focus:ring-blue-100 font-bold leading-none text-black text-xs sm:text-base transition-shadow" />
+                         <input name="tempatLahir" required type="text" className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl outline-none focus:ring-4 focus:ring-blue-100 font-bold leading-none text-black text-xs sm:text-base transition-shadow relative z-20" />
                       </div>
                       <div className="space-y-2 sm:space-y-3 w-full">
                          <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Tanggal Lahir</label>
-                         <input name="tanggalLahir" required type="date" className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl outline-none focus:ring-4 focus:ring-blue-100 font-bold leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px]" />
+                         <input name="tanggalLahir" required type="date" className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl outline-none focus:ring-4 focus:ring-blue-100 font-bold leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] relative z-20" />
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8 text-left leading-none w-full">
                       <div className="space-y-2 sm:space-y-3 w-full">
                          <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Jenis Kelamin</label>
-                         <select name="gender" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] cursor-pointer">
+                         <select name="gender" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] cursor-pointer relative z-20">
                             <option value="">-- Pilih Jenis Kelamin --</option>
                             <option value="Laki-laki">Laki-laki</option>
                             <option value="Perempuan">Perempuan</option>
@@ -927,26 +927,26 @@ export default function App() {
                       </div>
                       <div className="space-y-2 sm:space-y-3 w-full">
                          <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Agama</label>
-                         <select name="agama" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] cursor-pointer">
+                         <select name="agama" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] cursor-pointer relative z-20">
                             <option value="">-- Pilih Agama --</option>
                             {DAFTAR_AGAMA.map(a => <option key={a} value={a}>{a}</option>)}
                          </select>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8 text-left leading-none w-full">
-                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Telepon/WA</label><input name="telepon" required type="number" className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-black text-xs sm:text-base transition-shadow" /></div>
-                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Email</label><input name="email" required type="email" className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-black text-xs sm:text-base transition-shadow" /></div>
+                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Telepon/WA</label><input name="telepon" required type="number" className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-black text-xs sm:text-base transition-shadow relative z-20" /></div>
+                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Email</label><input name="email" required type="email" className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-black text-xs sm:text-base transition-shadow relative z-20" /></div>
                     </div>
                     <div className="space-y-2 sm:space-y-3 mb-5 sm:mb-8 w-full">
                        <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Alamat Lengkap</label>
-                       <textarea name="alamat" required rows="3" placeholder="Jalan, RT/RW, Desa/Kelurahan..." className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-black resize-none text-xs sm:text-base transition-shadow"></textarea>
+                       <textarea name="alamat" required rows="3" placeholder="Jalan, RT/RW, Desa/Kelurahan..." className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl outline-none focus:ring-4 focus:ring-blue-100 font-bold text-black resize-none text-xs sm:text-base transition-shadow relative z-20"></textarea>
                     </div>
                     <hr className="my-5 sm:my-10 border-slate-200 border-dashed w-full" />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8 text-left leading-none w-full">
-                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Program Kursus</label><select name="program" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] cursor-pointer"><option value="">-- Pilih Jurusan --</option>{PROGRAM_CHOICES.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Program Kursus</label><select name="program" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] cursor-pointer relative z-20"><option value="">-- Pilih Jurusan --</option>{PROGRAM_CHOICES.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
                       <div className="space-y-2 sm:space-y-3 w-full">
                          <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Kategori Kelas</label>
-                         <select name="category" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] cursor-pointer">
+                         <select name="category" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] cursor-pointer relative z-20">
                             <option value="">-- Pilih Kategori --</option>
                             <option value="Reguler">Reguler</option>
                             <option value="Private">Private</option>
@@ -956,16 +956,16 @@ export default function App() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8 text-left leading-none w-full">
                       <div className="space-y-2 sm:space-y-3 w-full">
                          <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Jam Belajar</label>
-                         <select name="jamBelajar" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] cursor-pointer">
+                         <select name="jamBelajar" required className="w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold bg-white outline-none leading-none text-black text-xs sm:text-base transition-shadow min-h-[44px] cursor-pointer relative z-20">
                             <option value="">-- Pilih Jam --</option>
                             {JAM_BELAJAR_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
                          </select>
                       </div>
-                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Tanggal Mulai</label><input name="tanggalMulaiBelajar" required type="date" className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold outline-none text-black text-xs sm:text-base transition-shadow min-h-[44px]" /></div>
+                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Tanggal Mulai</label><input name="tanggalMulaiBelajar" required type="date" className="appearance-none w-full px-4 sm:px-7 py-3 sm:py-5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-3xl font-bold outline-none text-black text-xs sm:text-base transition-shadow min-h-[44px] relative z-20" /></div>
                     </div>
                     
-                    <div className="w-full pt-4">
-                      <button type="submit" className="w-full py-4 sm:py-7 bg-blue-600 text-white font-black rounded-xl sm:rounded-[2.5rem] shadow-xl hover:bg-blue-700 active:scale-95 transition-all uppercase tracking-widest text-[10px] sm:text-[11px] leading-none text-center shrink-0 block cursor-pointer">Hantar Pendaftaran</button>
+                    <div className="w-full pt-4 relative z-20">
+                      <button type="submit" className="w-full py-4 sm:py-7 bg-blue-600 text-white font-black rounded-xl sm:rounded-[2.5rem] shadow-xl hover:bg-blue-700 active:scale-95 transition-all uppercase tracking-widest text-[10px] sm:text-[11px] leading-none text-center shrink-0 block relative z-30 cursor-pointer">Hantar Pendaftaran</button>
                     </div>
                   </form>
                 </div>
@@ -974,7 +974,7 @@ export default function App() {
 
             {/* TAB DATABASE HIERARKI */}
             {activeTab === 'database' && (
-              <div className="animate-in fade-in duration-700 text-left leading-none text-left w-full min-w-0">
+              <div className="animate-in fade-in duration-700 relative text-left leading-none text-left w-full min-w-0">
                 
                 {/* Level 0: Pilih Status */}
                 {!dbViewStatus && (
@@ -1005,24 +1005,39 @@ export default function App() {
                 {dbViewStatus && !dbViewProgram && (
                    <div className="space-y-5 sm:space-y-8 animate-in slide-in-from-right-8 duration-500 w-full min-w-0">
                       <div className="flex items-center gap-3 sm:gap-6 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm shrink-0 min-w-0 w-full">
-                         <button onClick={() => setDbViewStatus(null)} className="p-2.5 sm:p-3 bg-slate-50 rounded-xl hover:bg-blue-100 hover:text-blue-600 transition-colors text-slate-400 border border-slate-200 shrink-0 cursor-pointer"><ChevronLeft size={18} className="sm:w-5 sm:h-5 shrink-0" /></button>
+                         <button onClick={() => setDbViewStatus(null)} className="p-2.5 sm:p-3 bg-slate-50 rounded-xl hover:bg-blue-100 hover:text-blue-600 transition-colors text-slate-400 border border-slate-200 shrink-0 relative z-20 cursor-pointer"><ChevronLeft size={18} className="sm:w-5 sm:h-5 shrink-0" /></button>
                          <div className="min-w-0 flex-1">
                             <p className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 truncate">Direktori Status</p>
                             <h2 className="text-lg sm:text-2xl font-black text-slate-800 uppercase tracking-tight truncate">{dbViewStatus}</h2>
                          </div>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 w-full">
-                         {PROGRAM_CHOICES.map((course, idx) => {
-                            const count = participants.filter(p => p.status === dbViewStatus && p.program === course).length;
-                            return (
-                               <div key={idx} onClick={() => setDbViewProgram(course)} className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 cursor-pointer flex justify-between items-center group min-w-0 w-full gap-3">
-                                  <h3 className="text-xs sm:text-sm font-black text-slate-700 group-hover:text-blue-700 uppercase tracking-tight min-w-0 flex-1 truncate">{course.split(' (')[0]}</h3>
-                                  <span className="bg-slate-100 text-slate-500 px-2.5 sm:px-3 py-1.5 rounded-lg font-black text-[9px] sm:text-[10px] uppercase group-hover:bg-blue-200 group-hover:text-blue-800 transition-colors shrink-0 whitespace-nowrap">
-                                     {count} Siswa
-                                  </span>
-                               </div>
-                            )
-                         })}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 w-full relative z-10">
+                         {(() => {
+                             // Mengambil program standar DAN program apa pun yang ada di database (antisipasi salah ketik/CSV error)
+                             const programsInDb = participants.filter(p => p.status === dbViewStatus).map(p => p.program || 'Tanpa Program');
+                             const allUniquePrograms = Array.from(new Set([...PROGRAM_CHOICES, ...programsInDb]));
+
+                             return allUniquePrograms.map((course, idx) => {
+                                const count = participants.filter(p => p.status === dbViewStatus && (p.program || 'Tanpa Program') === course).length;
+                                
+                                // Hanya tampilkan jika program standar, atau jika program tidak standar tapi memiliki data
+                                if (count === 0 && !PROGRAM_CHOICES.includes(course)) return null;
+
+                                const isErrorData = !PROGRAM_CHOICES.includes(course);
+
+                                return (
+                                   <div key={idx} onClick={() => setDbViewProgram(course)} className={`bg-white p-4 sm:p-5 rounded-2xl border ${isErrorData ? 'border-red-300 hover:bg-red-50' : 'border-slate-200 hover:bg-blue-50 hover:border-blue-500'} shadow-sm transition-all duration-200 cursor-pointer flex justify-between items-center group min-w-0 w-full gap-3 relative z-10`}>
+                                      <div className="min-w-0 flex-1">
+                                          <h3 className={`text-xs sm:text-sm font-black uppercase tracking-tight truncate w-full text-left ${isErrorData ? 'text-red-600' : 'text-slate-700 group-hover:text-blue-700'}`}>{course.split(' (')[0]}</h3>
+                                          {isErrorData && <p className="text-[8px] font-bold text-red-500 mt-1 uppercase">⚠️ Data Tidak Valid</p>}
+                                      </div>
+                                      <span className={`${isErrorData ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500 group-hover:bg-blue-200 group-hover:text-blue-800'} px-2.5 sm:px-3 py-1.5 rounded-lg font-black text-[9px] sm:text-[10px] uppercase transition-colors shrink-0 whitespace-nowrap`}>
+                                         {count} Siswa
+                                      </span>
+                                   </div>
+                                )
+                             })
+                         })()}
                       </div>
                    </div>
                 )}
@@ -1031,7 +1046,7 @@ export default function App() {
                 {dbViewStatus && dbViewProgram && !dbViewCategory && (
                    <div className="space-y-5 sm:space-y-8 animate-in slide-in-from-right-8 duration-500 w-full min-w-0">
                       <div className="flex items-center gap-3 sm:gap-6 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm shrink-0 min-w-0 w-full">
-                         <button onClick={() => setDbViewProgram(null)} className="p-2.5 sm:p-3 bg-slate-50 rounded-xl hover:bg-blue-100 hover:text-blue-600 transition-colors text-slate-400 border border-slate-200 shrink-0 cursor-pointer"><ChevronLeft size={18} className="sm:w-5 sm:h-5 shrink-0" /></button>
+                         <button onClick={() => setDbViewProgram(null)} className="p-2.5 sm:p-3 bg-slate-50 rounded-xl hover:bg-blue-100 hover:text-blue-600 transition-colors text-slate-400 border border-slate-200 shrink-0 relative z-20 cursor-pointer"><ChevronLeft size={18} className="sm:w-5 sm:h-5 shrink-0" /></button>
                          <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 sm:gap-3 mb-1 min-w-0">
                                <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">{dbViewStatus}</span>
@@ -1041,19 +1056,29 @@ export default function App() {
                          </div>
                       </div>
                       
-                      <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-6 max-w-4xl mx-auto w-full">
-                         <div onClick={() => setDbViewCategory('Reguler')} className="flex-1 bg-gradient-to-br from-blue-500 to-blue-700 text-white p-8 sm:p-12 rounded-[2rem] sm:rounded-[3rem] shadow-lg hover:shadow-2xl hover:shadow-blue-500/40 hover:-translate-y-1 sm:hover:-translate-y-2 transition-all duration-300 cursor-pointer flex flex-col items-center text-center gap-3 sm:gap-4 border-2 sm:border-4 border-white overflow-hidden group w-full">
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors pointer-events-none"></div>
-                            <Users size={48} className="sm:w-[64px] sm:h-[64px] opacity-90 mb-1 sm:mb-2 shrink-0" />
-                            <h3 className="text-xl sm:text-3xl font-black uppercase tracking-widest">REGULER</h3>
-                            <p className="text-[9px] sm:text-sm font-bold text-blue-100 uppercase tracking-widest">Kelas Berkelompok</p>
-                         </div>
-                         <div onClick={() => setDbViewCategory('Private')} className="flex-1 bg-gradient-to-br from-purple-500 to-purple-700 text-white p-8 sm:p-12 rounded-[2rem] sm:rounded-[3rem] shadow-lg hover:shadow-2xl hover:shadow-purple-500/40 hover:-translate-y-1 sm:hover:-translate-y-2 transition-all duration-300 cursor-pointer flex flex-col items-center text-center gap-3 sm:gap-4 border-2 sm:border-4 border-white overflow-hidden group w-full">
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors pointer-events-none"></div>
-                            <User size={48} className="sm:w-[64px] sm:h-[64px] opacity-90 mb-1 sm:mb-2 shrink-0" />
-                            <h3 className="text-xl sm:text-3xl font-black uppercase tracking-widest">PRIVATE</h3>
-                            <p className="text-[9px] sm:text-sm font-bold text-purple-100 uppercase tracking-widest">Kelas Perorangan</p>
-                         </div>
+                      <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-6 max-w-4xl mx-auto w-full relative z-10">
+                         {(() => {
+                             const categoriesInDb = participants.filter(p => p.status === dbViewStatus && (p.program || 'Tanpa Program') === dbViewProgram).map(p => p.category || 'Tidak Diketahui');
+                             const allUniqueCategories = Array.from(new Set(['Reguler', 'Private', ...categoriesInDb]));
+
+                             return allUniqueCategories.map((cat, idx) => {
+                                  const count = participants.filter(p => p.status === dbViewStatus && (p.program || 'Tanpa Program') === dbViewProgram && (p.category || 'Tidak Diketahui') === cat).length;
+                                  
+                                  // Hanya tampilkan jika kategori standar, atau jika kategori aneh punya isi data
+                                  if (count === 0 && cat !== 'Reguler' && cat !== 'Private') return null;
+
+                                  const isErrorData = cat !== 'Reguler' && cat !== 'Private';
+
+                                  return (
+                                      <div key={idx} onClick={() => setDbViewCategory(cat)} className={`flex-1 p-8 sm:p-12 rounded-[2rem] sm:rounded-[3rem] shadow-lg hover:shadow-2xl hover:-translate-y-1 sm:hover:-translate-y-2 transition-all duration-300 cursor-pointer flex flex-col items-center text-center gap-3 sm:gap-4 border-2 sm:border-4 border-white overflow-hidden group w-full ${cat === 'Reguler' ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white hover:shadow-blue-500/40' : cat === 'Private' ? 'bg-gradient-to-br from-purple-500 to-purple-700 text-white hover:shadow-purple-500/40' : 'bg-gradient-to-br from-red-500 to-red-700 text-white hover:shadow-red-500/40'}`}>
+                                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors pointer-events-none"></div>
+                                         {cat === 'Reguler' ? <Users size={48} className="sm:w-[64px] sm:h-[64px] opacity-90 mb-1 sm:mb-2 shrink-0" /> : cat === 'Private' ? <User size={48} className="sm:w-[64px] sm:h-[64px] opacity-90 mb-1 sm:mb-2 shrink-0" /> : <AlertCircle size={48} className="sm:w-[64px] sm:h-[64px] opacity-90 mb-1 sm:mb-2 shrink-0" />}
+                                         <h3 className="text-xl sm:text-3xl font-black uppercase tracking-widest">{cat}</h3>
+                                         <p className={`text-[9px] sm:text-sm font-bold uppercase tracking-widest ${isErrorData ? 'text-white' : 'text-white/80'}`}>{isErrorData ? `⚠️ Data Invalid (${count} Siswa)` : `${count} Siswa`}</p>
+                                      </div>
+                                  )
+                             })
+                         })()}
                       </div>
                    </div>
                 )}
@@ -1098,8 +1123,8 @@ export default function App() {
                            {(() => {
                                const filteredDb = participants.filter(p => {
                                    return p.status === dbViewStatus && 
-                                          p.program === dbViewProgram && 
-                                          p.category === dbViewCategory &&
+                                          (p.program || 'Tanpa Program') === dbViewProgram && 
+                                          (p.category || 'Tidak Diketahui') === dbViewCategory &&
                                           p.nama.toLowerCase().includes(searchQuery.toLowerCase());
                                });
 
