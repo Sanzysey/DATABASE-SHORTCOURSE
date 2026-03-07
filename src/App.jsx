@@ -114,18 +114,18 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [message, setMessage] = useState(null);
-  const [isImporting, setIsImporting] = useState(false); 
+  
+  // State untuk Data Database
+  const [certificates, setCertificates] = useState([]);
+  const [participants, setParticipants] = useState([]);
   
   // State untuk Database Hierarchy
   const [dbViewStatus, setDbViewStatus] = useState(null);
   const [dbViewProgram, setDbViewProgram] = useState(null);
   const [dbViewCategory, setDbViewCategory] = useState(null);
-  
   const [searchQuery, setSearchQuery] = useState("");
-  
-  const [certificates, setCertificates] = useState([]);
-  const [participants, setParticipants] = useState([]);
 
+  // State Modal Global
   const [selectedParticipant, setSelectedParticipant] = useState(null);
   const [participantToDelete, setParticipantToDelete] = useState(null); 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -134,12 +134,15 @@ export default function App() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [tempNilai, setTempNilai] = useState([]);
   
+  // STATE BARU UNTUK PREVIEW CSV
+  const [isImporting, setIsImporting] = useState(false);
+  const [csvPreviewData, setCsvPreviewData] = useState([]);
+  const [isCsvPreviewModalOpen, setIsCsvPreviewModalOpen] = useState(false);
+
   // State untuk Absensi
   const [selectedAbsensiCourse, setSelectedAbsensiCourse] = useState(null);
-
   const currentAbsensiCategory = activeTab === 'absensi_reguler' ? 'Reguler' : (activeTab === 'absensi_private' ? 'Private' : null);
   const isReguler = currentAbsensiCategory === 'Reguler';
-
   const [piketReguler, setPiketReguler] = useState("");
   const [selectedStudentForAbsen, setSelectedStudentForAbsen] = useState("");
   const [dailyAttendees, setDailyAttendees] = useState([]);
@@ -194,6 +197,7 @@ export default function App() {
     setIsDetailModalOpen(false);
     setIsEditProfileModalOpen(false);
     setIsNilaiModalOpen(false);
+    setIsCsvPreviewModalOpen(false);
     setSelectedParticipant(null);
     setParticipantToDelete(null);
     setSearchQuery("");
@@ -375,18 +379,22 @@ export default function App() {
     setTimeout(() => { window.print(); }, 400);
   };
 
+  // ==========================================
+  // FITUR: IMPORT CSV PREVIEW OTOMATIS
+  // ==========================================
   const handleImportCSV = (e) => {
     const file = e.target.files[0];
     if(!file || !user) return;
     
     setIsImporting(true);
-    showNotification("Sedang membaca dan mengimpor data CSV...");
+    showNotification("Membaca file CSV untuk pratinjau...");
     
     const reader = new FileReader();
     reader.onload = async (event) => {
        const text = event.target.result;
        const lines = text.split('\n');
-       let importedCount = 0;
+       
+       let parsedData = [];
        
        for(let i = 1; i < lines.length; i++) {
            if(!lines[i].trim()) continue;
@@ -405,6 +413,7 @@ export default function App() {
            else if (rawLower.includes("office basic")) program = "Microsoft Office Basic (12x Pertemuan)";
            else if (rawLower.includes("excel")) program = "Microsoft Office Excel (20x Pertemuan)";
            else if (rawLower.includes("design grafis") || rawLower.includes("desain grafis")) program = "Desain Grafis (24x Pertemuan)";
+           else if (!program || program === "") program = "Microsoft Office Basic (12x Pertemuan)"; // fallback aman
            
            let rawStatus = values[7] ? values[7].replace(/"/g, '').trim() : "";
            let status = "Aktif";
@@ -420,7 +429,7 @@ export default function App() {
                telepon: values[8] ? values[8].replace(/"/g, '').trim() : "",
                email: "",
                alamat: "",
-               program: program || "Microsoft Office Basic (12x Pertemuan)", 
+               program: program, 
                category: values[9] ? values[9].replace(/"/g, '').trim() : "Reguler",
                jamBelajar: "",
                tanggalMulaiBelajar: values[10] ? values[10].replace(/"/g, '').trim() : "",
@@ -433,22 +442,47 @@ export default function App() {
                pengajarPrivate: ""
            };
 
-           try {
-              await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'participants'), newParticipant);
-              importedCount++;
-           } catch(err) {
-              console.error("Gagal import baris CSV ke-", i, err);
-           }
+           parsedData.push(newParticipant);
        }
        
+       setCsvPreviewData(parsedData);
+       setIsCsvPreviewModalOpen(true);
        setIsImporting(false);
-       showNotification(`Sukses! ${importedCount} data siswa berhasil diimpor.`);
-       e.target.value = null; 
-       setActiveTab('database'); 
+       e.target.value = null; // Reset
     };
     reader.readAsText(file);
   };
 
+  const handlePreviewChange = (index, field, value) => {
+      const updatedPreview = [...csvPreviewData];
+      updatedPreview[index][field] = value;
+      setCsvPreviewData(updatedPreview);
+  };
+
+  const confirmImportCSV = async () => {
+      if(!user) return;
+      setIsCsvPreviewModalOpen(false);
+      showNotification(`Memulai proses upload ${csvPreviewData.length} data ke database...`);
+      
+      let importedCount = 0;
+      for (let participant of csvPreviewData) {
+          try {
+              await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'participants'), participant);
+              importedCount++;
+          } catch(err) {
+              console.error("Gagal import baris CSV", err);
+          }
+      }
+      
+      showNotification(`Sukses! ${importedCount} data siswa berhasil diimpor.`);
+      setCsvPreviewData([]);
+      setActiveTab('database'); 
+  };
+
+
+  // ==========================================
+  // LOGIKA ABSENSI REGULER (DENGAN MANUAL BACKFILL)
+  // ==========================================
   const handleAddDailyAttendee = () => {
       if(!selectedStudentForAbsen) return;
       const student = participants.find(p => p.id === selectedStudentForAbsen);
@@ -1013,9 +1047,14 @@ export default function App() {
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 w-full relative z-10">
                          {(() => {
-                             // Mengambil program standar DAN program apa pun yang ada di database (antisipasi salah ketik/CSV error)
+                             // FILTER ANTI DATA SILUMAN: Sembunyikan agama/gender dari list program
+                             const invalidProgramsToHide = [...DAFTAR_AGAMA, "Laki-laki", "Perempuan", "Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Khonghucu"];
+                             
+                             // Mengambil program standar DAN program apa pun yang ada di database
                              const programsInDb = participants.filter(p => p.status === dbViewStatus).map(p => p.program || 'Tanpa Program');
-                             const allUniquePrograms = Array.from(new Set([...PROGRAM_CHOICES, ...programsInDb]));
+                             
+                             // Gabungkan dan saring data yang invalid
+                             const allUniquePrograms = Array.from(new Set([...PROGRAM_CHOICES, ...programsInDb])).filter(course => !invalidProgramsToHide.includes(course));
 
                              return allUniquePrograms.map((course, idx) => {
                                 const count = participants.filter(p => p.status === dbViewStatus && (p.program || 'Tanpa Program') === course).length;
@@ -1138,10 +1177,10 @@ export default function App() {
                                }
 
                                return filteredDb.map((p, i) => (
-                                   <div key={p.id} className="flex flex-col md:grid md:grid-cols-12 gap-4 items-start md:items-center p-4 sm:p-6 hover:bg-blue-50/50 transition-colors group w-full min-w-0">
+                                   <div key={p.id} className="flex flex-col md:grid md:grid-cols-12 gap-4 items-start md:items-center p-4 sm:p-6 hover:bg-blue-50/50 transition-colors group w-full min-w-0 relative z-10">
                                        
                                        {/* Kiri: Avatar + Nama (Klik untuk detail) */}
-                                       <div className="w-full md:col-span-7 flex items-center gap-3 sm:gap-4 min-w-0 cursor-pointer" onClick={() => handleOpenDetail(p)}>
+                                       <div className="w-full md:col-span-7 flex items-center gap-3 sm:gap-4 min-w-0 cursor-pointer relative z-20" onClick={() => handleOpenDetail(p)}>
                                            <div className="hidden md:flex w-8 justify-center font-bold text-slate-400 text-sm shrink-0">{i + 1}</div>
                                            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl border border-slate-200 shadow-sm bg-white flex items-center justify-center overflow-hidden shrink-0 group-hover:border-blue-300 transition-colors">
                                               {p.photo ? <img src={p.photo} className="w-full h-full object-cover shrink-0" /> : <img src={IKON_GENDER[p.gender]} className="w-6 h-6 opacity-30 shrink-0" />}
@@ -1155,7 +1194,7 @@ export default function App() {
                                        </div>
 
                                        {/* Kanan: Status & Aksi (Menumpuk di HP, sebaris di PC) */}
-                                       <div className="w-full md:col-span-5 flex items-center justify-between md:justify-end gap-4 pt-3 md:pt-0 border-t border-slate-100 md:border-none min-w-0">
+                                       <div className="w-full md:col-span-5 flex items-center justify-between md:justify-end gap-4 pt-3 md:pt-0 border-t border-slate-100 md:border-none min-w-0 relative z-30">
                                            {/* Status */}
                                            <div className="shrink-0">
                                               <span className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-full text-[8px] sm:text-[10px] font-black tracking-widest uppercase border whitespace-nowrap ${p.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : p.status === 'Lulus' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
@@ -1706,6 +1745,158 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* --- MODAL EDIT PROFIL LENGKAP (BARU) --- */}
+        {isEditProfileModalOpen && selectedParticipant && (
+          <div className="fixed inset-0 z-[400] flex items-center justify-center p-4">
+             <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-md" onClick={() => setIsEditProfileModalOpen(false)} />
+             <div className="relative bg-white w-full max-w-4xl rounded-3xl sm:rounded-[4rem] shadow-2xl overflow-hidden flex flex-col border-4 sm:border-8 border-slate-50 animate-in zoom-in-95 leading-none text-left max-h-[90vh]">
+                <div className="bg-indigo-600 p-6 sm:p-10 text-white flex justify-between items-center leading-none shrink-0">
+                   <div className="min-w-0 text-left">
+                      <h3 className="text-xl sm:text-3xl font-black uppercase tracking-tighter truncate text-white">Edit Profil Peserta</h3>
+                      <p className="text-[9px] sm:text-[11px] text-indigo-100 mt-1.5 sm:mt-2 font-bold uppercase tracking-widest truncate">Perbarui Data Lengkap Siswa</p>
+                   </div>
+                   <button onClick={() => setIsEditProfileModalOpen(false)} className="hover:rotate-90 transition-transform shrink-0 ml-4 cursor-pointer"><X size={24} className="sm:w-7 sm:h-7 text-white" /></button>
+                </div>
+                <form onSubmit={handleSaveProfileUpdate} className="p-5 sm:p-12 space-y-5 sm:space-y-6 flex flex-col text-left leading-none text-black w-full min-w-0 overflow-y-auto bg-slate-50/50">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 text-left leading-none w-full">
+                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">NIK</label><input name="nik" defaultValue={selectedParticipant.nik} required type="number" className="appearance-none w-full px-4 sm:px-6 py-3 sm:py-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 font-bold leading-none text-black text-xs sm:text-sm transition-shadow" /></div>
+                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Nama Lengkap</label><input name="nama" defaultValue={selectedParticipant.nama} required type="text" className="appearance-none w-full px-4 sm:px-6 py-3 sm:py-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 font-bold uppercase leading-none text-black text-xs sm:text-sm transition-shadow" /></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 text-left leading-none w-full">
+                      <div className="space-y-2 sm:space-y-3 w-full">
+                         <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Tempat Lahir</label>
+                         <input name="tempatLahir" defaultValue={selectedParticipant.tempatLahir} required type="text" className="appearance-none w-full px-4 sm:px-6 py-3 sm:py-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 font-bold leading-none text-black text-xs sm:text-sm transition-shadow" />
+                      </div>
+                      <div className="space-y-2 sm:space-y-3 w-full">
+                         <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Tanggal Lahir</label>
+                         <input name="tanggalLahir" defaultValue={selectedParticipant.tanggalLahir} required type="date" className="appearance-none w-full px-4 sm:px-6 py-3 sm:py-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 font-bold leading-none text-black text-xs sm:text-sm transition-shadow min-h-[44px]" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 text-left leading-none w-full">
+                      <div className="space-y-2 sm:space-y-3 w-full">
+                         <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Jenis Kelamin</label>
+                         <select name="gender" defaultValue={selectedParticipant.gender} required className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 leading-none text-black text-xs sm:text-sm transition-shadow min-h-[44px] cursor-pointer">
+                            <option value="">-- Pilih Jenis Kelamin --</option>
+                            <option value="Laki-laki">Laki-laki</option>
+                            <option value="Perempuan">Perempuan</option>
+                         </select>
+                      </div>
+                      <div className="space-y-2 sm:space-y-3 w-full">
+                         <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Agama</label>
+                         <select name="agama" defaultValue={selectedParticipant.agama} required className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 leading-none text-black text-xs sm:text-sm transition-shadow min-h-[44px] cursor-pointer">
+                            <option value="">-- Pilih Agama --</option>
+                            {DAFTAR_AGAMA.map(a => <option key={a} value={a}>{a}</option>)}
+                         </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 text-left leading-none w-full">
+                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Telepon/WA</label><input name="telepon" defaultValue={selectedParticipant.telepon} required type="number" className="appearance-none w-full px-4 sm:px-6 py-3 sm:py-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 font-bold text-black text-xs sm:text-sm transition-shadow" /></div>
+                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Email</label><input name="email" defaultValue={selectedParticipant.email} required type="email" className="appearance-none w-full px-4 sm:px-6 py-3 sm:py-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 font-bold text-black text-xs sm:text-sm transition-shadow" /></div>
+                    </div>
+                    <div className="space-y-2 sm:space-y-3 w-full">
+                       <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Alamat Lengkap</label>
+                       <textarea name="alamat" defaultValue={selectedParticipant.alamat} required rows="2" className="appearance-none w-full px-4 sm:px-6 py-3 sm:py-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 font-bold text-black resize-none text-xs sm:text-sm transition-shadow"></textarea>
+                    </div>
+                    <hr className="my-2 sm:my-4 border-slate-200 border-dashed w-full" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 text-left leading-none w-full">
+                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Program Kursus</label><select name="program" defaultValue={selectedParticipant.program} required className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 leading-none text-black text-xs sm:text-sm transition-shadow min-h-[44px] cursor-pointer"><option value="">-- Pilih Jurusan --</option>{PROGRAM_CHOICES.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                      <div className="space-y-2 sm:space-y-3 w-full">
+                         <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Kategori Kelas</label>
+                         <select name="category" defaultValue={selectedParticipant.category} required className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 leading-none text-black text-xs sm:text-sm transition-shadow min-h-[44px] cursor-pointer">
+                            <option value="">-- Pilih Kategori --</option>
+                            <option value="Reguler">Reguler</option>
+                            <option value="Private">Private</option>
+                         </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 text-left leading-none w-full">
+                      <div className="space-y-2 sm:space-y-3 w-full">
+                         <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Jam Belajar</label>
+                         <select name="jamBelajar" defaultValue={selectedParticipant.jamBelajar} required className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 leading-none text-black text-xs sm:text-sm transition-shadow min-h-[44px] cursor-pointer">
+                            <option value="">-- Pilih Jam --</option>
+                            {JAM_BELAJAR_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
+                         </select>
+                      </div>
+                      <div className="space-y-2 sm:space-y-3 w-full"><label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-left block">Tanggal Mulai</label><input name="tanggalMulaiBelajar" defaultValue={selectedParticipant.tanggalMulaiBelajar} required type="date" className="appearance-none w-full px-4 sm:px-6 py-3 sm:py-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 text-black text-xs sm:text-sm transition-shadow min-h-[44px]" /></div>
+                    </div>
+                    <button type="submit" className="w-full py-4 sm:py-6 bg-indigo-600 text-white font-black rounded-xl sm:rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-[0.98] transition-all uppercase tracking-widest text-[10px] sm:text-[11px] leading-none text-center mt-2 sm:mt-6 shrink-0 block cursor-pointer">Simpan Perubahan Profil</button>
+                </form>
+             </div>
+          </div>
+        )}
+
+        {/* --- MODAL PREVIEW CSV (BARU) --- */}
+        {isCsvPreviewModalOpen && (
+          <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
+             <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={() => setIsCsvPreviewModalOpen(false)} />
+             <div className="relative bg-white w-full max-w-6xl rounded-3xl sm:rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-4 sm:border-8 border-slate-50 animate-in zoom-in-95 leading-none text-left max-h-[95vh]">
+                <div className="bg-emerald-600 p-5 sm:p-8 text-white flex justify-between items-center shrink-0">
+                    <div className="min-w-0">
+                       <h3 className="text-lg sm:text-2xl font-black uppercase tracking-tighter truncate text-white">Preview Data CSV</h3>
+                       <p className="text-[9px] sm:text-[10px] text-emerald-100 mt-1 font-bold uppercase tracking-widest truncate">Cek & Perbaiki Data Sebelum Import ({csvPreviewData.length} Baris)</p>
+                    </div>
+                    <button onClick={() => setIsCsvPreviewModalOpen(false)} className="hover:rotate-90 transition-transform shrink-0 ml-4 cursor-pointer"><X size={24} className="text-white"/></button>
+                </div>
+                
+                <div className="flex-grow overflow-auto p-4 sm:p-6 bg-slate-50 relative">
+                   <table className="w-full text-left min-w-[900px] border-collapse">
+                      <thead className="sticky top-0 bg-slate-200 z-10 shadow-sm">
+                         <tr className="text-slate-600 text-[10px] uppercase font-black tracking-widest">
+                            <th className="p-3 w-12 text-center">No</th>
+                            <th className="p-3">Nama Lengkap (Bisa Diedit)</th>
+                            <th className="p-3 w-64">Program Kursus</th>
+                            <th className="p-3 w-32">Kategori</th>
+                            <th className="p-3 w-32">Status</th>
+                            <th className="p-3 w-16 text-center">Batal</th>
+                         </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                         {csvPreviewData.map((row, i) => (
+                            <tr key={i} className="hover:bg-white transition-colors group">
+                               <td className="p-2 text-center font-bold text-xs text-slate-400">{i + 1}</td>
+                               <td className="p-2">
+                                   <input value={row.nama} onChange={(e) => handlePreviewChange(i, 'nama', e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none uppercase transition-all" />
+                               </td>
+                               <td className="p-2">
+                                   <select value={row.program} onChange={(e) => handlePreviewChange(i, 'program', e.target.value)} className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[10px] sm:text-xs font-bold text-slate-700 focus:border-emerald-500 outline-none cursor-pointer">
+                                       {PROGRAM_CHOICES.map(p => <option key={p} value={p}>{p}</option>)}
+                                   </select>
+                               </td>
+                               <td className="p-2">
+                                   <select value={row.category} onChange={(e) => handlePreviewChange(i, 'category', e.target.value)} className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[10px] sm:text-xs font-bold text-slate-700 focus:border-emerald-500 outline-none cursor-pointer">
+                                       <option value="Reguler">Reguler</option>
+                                       <option value="Private">Private</option>
+                                   </select>
+                               </td>
+                               <td className="p-2">
+                                   <select value={row.status} onChange={(e) => handlePreviewChange(i, 'status', e.target.value)} className="w-full px-2 py-2 border border-slate-200 rounded-lg text-[10px] sm:text-xs font-bold text-slate-700 focus:border-emerald-500 outline-none cursor-pointer">
+                                       <option value="Aktif">Aktif</option>
+                                       <option value="Lulus">Lulus</option>
+                                   </select>
+                               </td>
+                               <td className="p-2 text-center">
+                                   <button onClick={() => { const nd = [...csvPreviewData]; nd.splice(i, 1); setCsvPreviewData(nd); }} className="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition-colors cursor-pointer"><Trash2 size={16}/></button>
+                               </td>
+                            </tr>
+                         ))}
+                      </tbody>
+                   </table>
+                   {csvPreviewData.length === 0 && (
+                      <div className="text-center p-12 font-bold text-slate-400 text-sm">Semua data telah dihapus dari antrean import.</div>
+                   )}
+                </div>
+
+                <div className="p-4 sm:p-6 bg-white border-t border-slate-200 flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4 shrink-0">
+                   <button onClick={() => setIsCsvPreviewModalOpen(false)} className="px-6 py-3 sm:py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs uppercase tracking-widest transition-colors w-full sm:w-auto text-center cursor-pointer block">Batal Import</button>
+                   <button onClick={confirmImportCSV} disabled={csvPreviewData.length === 0} className="px-8 py-3 sm:py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer block">
+                      <Upload size={16} className="shrink-0" /> Konfirmasi & Simpan {csvPreviewData.length} Data
+                   </button>
+                </div>
+             </div>
+          </div>
+        )}
+
       </div>
 
       {/* --- AREA OUTPUT TRANSKRIP PDF --- */}
