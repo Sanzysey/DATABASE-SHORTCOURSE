@@ -1,12 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
 
+// https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [
-    tailwindcss(),
-    react(),
-  ],
-  // Tambahkan baris ini, wajib sama dengan nama repo Bapak di GitHub
-  base: '/DATABASE-SHORTCOURSE/', 
+  plugins: [react()],
+  base: '/DATABASE-SHORTCOURSE/', // INI SANGAT PENTING
 })
